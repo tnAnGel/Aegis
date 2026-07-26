@@ -1,0 +1,7 @@
+{
+  "brand.tagline": "Secure Proxy",
+  "title": "Page not found",
+  "description": "The route you requested doesn't exist in this panel. It may have been moved, removed, or the URL might be mistyped.",
+  "backToDashboard": "Back to dashboard",
+  "footer": "Aegis admin panel — proxy is unaffected by this error."
+}

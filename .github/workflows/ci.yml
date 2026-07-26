@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  fmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  test:
+    name: build + test + clippy
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        rust: [stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo check
+        run: cargo check --all-targets
+      # Blocking clippy gate. Scoped to the lint groups that describe real
+      # defects — correctness, suspicious, perf — rather than every stylistic
+      # lint the newest stable happens to ship. RUSTFLAGS is cleared for this
+      # step because the workflow-level `-D warnings` would otherwise promote
+      # *every* clippy lint to an error, so a new pedantic lint in a future
+      # toolchain would break the build on code that did not change.
+      - name: cargo clippy (correctness gate)
+        env:
+          RUSTFLAGS: ""
+        run: >
+          cargo clippy --all-targets --
+          -D clippy::correctness -D clippy::suspicious -D clippy::perf
+      # Informational: the full lint surface, including style and complexity.
+      # Non-blocking on purpose — read it, do not let it red-badge the repo.
+      - name: cargo clippy (full, informational)
+        continue-on-error: true
+        env:
+          RUSTFLAGS: ""
+        run: cargo clippy --all-targets -- -W clippy::all
+      - name: cargo test
+        run: cargo test --all-targets
+
+  pingora-feature:
+    name: build with --features pingora (production data plane)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # The default feature set does NOT include `pingora`, so a plain
+      # `cargo check` never compiles the binary operators actually run.
+      # Check it explicitly, warnings-as-errors like every other job.
+      - name: cargo check --features pingora
+        run: cargo check --features pingora --bin aegis-pingora --all-targets
+      - name: cargo test --features pingora
+        run: cargo test --features pingora --lib
+
+  xdp-feature:
+    name: build with --features xdp (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo check --features xdp
+        run: cargo check --features xdp --all-targets
+      - name: cargo test --features xdp
+        run: cargo test --features xdp --all-targets
+
+  bpf-program:
+    name: build BPF program (nightly)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+      - name: install bpf-linker
+        run: cargo install bpf-linker --locked
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: xdp/aegis-xdp-ebpf
+      - name: build aegis-xdp-ebpf
+        run: |
+          cargo build \
+            --release \
+            --manifest-path xdp/aegis-xdp-ebpf/Cargo.toml
+      - name: upload BPF object
+        uses: actions/upload-artifact@v4
+        with:
+          name: aegis-xdp-ebpf
+          path: xdp/aegis-xdp-ebpf/target/bpfel-unknown-none/release/aegis-xdp
+
+  bench-smoke:
+    name: bench tool smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: build bench binary
+        run: cargo build --release --bin aegis-bench
+      - name: invocation check (no target)
+        run: ./target/release/aegis-bench --help || true
+
+  e2e-load:
+    name: end-to-end load harness
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: build aegis + harness in release
+        run: cargo build --release --bin aegis --bin aegis-e2e
+      - name: run e2e scenarios
+        run: |
+          ./target/release/aegis-e2e \
+            --aegis-binary ./target/release/aegis \
+            --config-template bench/e2e-config.toml \
+            --dump-metrics > e2e-output.txt 2>&1
+          status=$?
+          cat e2e-output.txt
+          exit $status
+      - name: upload e2e output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-output-${{ matrix.os }}
+          path: e2e-output.txt

@@ -1,0 +1,18 @@
+{
+  "title": "Cluster",
+  "subtitle": "Shared-mmap cluster threat state. Per-IP threat scores are aggregated across all REUSEPORT workers, preventing distributed attackers from evading detection by hitting different worker shards.",
+  "loadError": "Couldn't load cluster status",
+  "overview": "Overview",
+  "sharedScorer": "Shared scorer",
+  "attached": "Attached",
+  "perWorkerOnly": "Per-worker only",
+  "activeSlots": "Active IPv4 slots",
+  "activeSlotsAria": "Active IPv4 slots: {{count}}",
+  "activeSlotsHint": "IP entries tracked in the shared mmap arena",
+  "topScores.title": "Top 10 threat scores (shared)",
+  "topScores.description": "Live ranking across all REUSEPORT workers via mmap arena.",
+  "topScores.empty": "No tracked IPs — either no traffic or shared scorer not attached.",
+  "topScores.col.rank": "#",
+  "topScores.col.ip": "IP Address",
+  "topScores.col.score": "Score"
+}

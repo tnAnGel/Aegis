@@ -1,0 +1,76 @@
+{
+  "title": "Log",
+  "description": "Per-request decision log. Every proxied request with how Aegis acted on it — action, reason, status, latency and client fingerprint.",
+  "live": "Live",
+  "paused": "Paused",
+  "pause": "Pause",
+  "resume": "Resume",
+  "filterTitle": "Filter",
+  "filterPlaceholder": "Filter by path, peer, or method…",
+  "filterAria": "Filter log",
+  "result_one": "{{count}} result for {{query}}",
+  "result_other": "{{count}} results for {{query}}",
+  "entriesTitle": "Entries",
+  "entriesDescription": "Request log — most recent events first.",
+  "entriesCount_one": "{{count}} entry",
+  "entriesCount_other": "{{count}} entries",
+  "emptyTitle": "No log entries",
+  "emptyDescription": "No requests match the current filters, or no request log is configured.",
+  "col.when": "When",
+  "col.method": "Method",
+  "col.path": "Path",
+  "col.peer": "Peer",
+  "col.role": "Role",
+  "col.status": "Status",
+  "columns": {
+    "time": "Time",
+    "host": "Host",
+    "method": "Method",
+    "path": "Path",
+    "status": "Status",
+    "action": "Action",
+    "reason": "Reason",
+    "ip": "Client IP",
+    "country": "Country",
+    "latency": "Latency"
+  },
+  "filters": {
+    "domain": "Domain",
+    "domainPlaceholder": "All domains",
+    "endpoint": "Endpoint",
+    "endpointPlaceholder": "Any endpoint",
+    "action": "Action",
+    "actionPlaceholder": "Any action",
+    "ip": "Client IP",
+    "ipPlaceholder": "Any IP",
+    "search": "Search",
+    "searchPlaceholder": "Search path, user agent, reason…",
+    "period": "Period"
+  },
+  "actions": {
+    "apply": "Apply",
+    "reset": "Reset",
+    "export": "Export"
+  },
+  "period": {
+    "1h": "Last hour",
+    "6h": "Last 6 hours",
+    "24h": "Last 24 hours",
+    "7d": "Last 7 days",
+    "30d": "Last 30 days"
+  },
+  "range": {
+    "live": "Live",
+    "historical": "Historical",
+    "custom": "Custom range",
+    "from": "From",
+    "to": "To"
+  },
+  "pagination": {
+    "showing": "Showing {{from}}–{{to}} of {{total}}",
+    "prev": "Previous",
+    "next": "Next",
+    "page": "Page {{page}}",
+    "perPage": "Per page"
+  }
+}

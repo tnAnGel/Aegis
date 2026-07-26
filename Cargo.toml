@@ -1,0 +1,321 @@
+[workspace]
+resolver = "2"
+members = [".", "xdp/aegis-xdp-common"]
+# aegis-xdp-ebpf is intentionally excluded from the workspace because it
+# targets `bpfel-unknown-none` and is built with a custom toolchain via
+# its own .cargo/config.toml. Build it with:
+#   cargo +nightly build --release --manifest-path xdp/aegis-xdp-ebpf/Cargo.toml
+exclude = ["xdp/aegis-xdp-ebpf"]
+default-members = ["."]
+
+[package]
+name = "aegis"
+version = "1.0.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Maxim Belyakov <darkzeit00@gmail.com>"]
+description = "High-performance reverse proxy / edge gateway for DDoS mitigation and L7 traffic filtering: WAF, JA3/JA4 fingerprinting, challenge ladder, eBPF/XDP fast path, HTTP/1.1 + HTTP/2 + HTTP/3."
+homepage = "https://github.com/tnAnGel/Aegis"
+repository = "https://github.com/tnAnGel/Aegis"
+documentation = "https://github.com/tnAnGel/Aegis/tree/main/docs"
+license = "AGPL-3.0-or-later"
+readme = "README.md"
+keywords = ["ddos", "waf", "reverse-proxy", "security", "ja4"]
+categories = ["network-programming", "web-programming::http-server"]
+exclude = [
+    "bench/",
+    "docs/",
+    "web/",
+    "WebLanding/",
+    "assets/screenshots/",
+]
+
+[features]
+default = []
+# Enables the Linux-only XDP fast-path. The loader pulls aya, attaches an
+# XDP program to a NIC and mirrors IP deny lists into a kernel BPF map.
+# Requires CAP_BPF + CAP_NET_ADMIN at runtime and a precompiled BPF object.
+xdp = ["dep:aya", "dep:aya-log"]
+# Phase B foundation — Pingora-based proxy core. Opt-in because pingora
+# pulls a large dep tree (boringssl/openssl by default; we use rustls).
+# When enabled, an alternate ProxyHttp implementation is compiled in
+# alongside the hyper-based one; operators choose at runtime via
+# AEGIS_PINGORA=1 / config flag. The hyper path remains the default
+# until Pingora migration is feature-complete.
+pingora = [
+    "dep:pingora-proxy",
+    "dep:pingora-core",
+    "dep:pingora-http",
+    "dep:openssl",
+    "dep:openssl-sys",
+    "dep:foreign-types-shared",
+]
+
+[dependencies]
+anyhow = "1"
+argon2 = "0.5"
+base64 = "0.22"
+bytes = "1"
+clap = { version = "4", features = ["derive"] }
+dashmap = "6"
+h3 = "0.0.8"
+h3-quinn = "0.0.10"
+hmac = "0.12"
+# V242 — real Ed25519 Privacy Pass token verification (RFC 9578 Type-1
+# publicly-verifiable tokens). `VerifyingKey::verify_strict` rejects the
+# malleable/torsion-component signatures that bare `verify` accepts, which
+# matters for an auth-bypass primitive. Pure-Rust, no C deps; default
+# features are fine (we only need the verifier half).
+ed25519-dalek = "2"
+include_dir = "0.7"
+md-5 = "0.10"
+http = "1"
+http-body = "1"
+http-body-util = "0.1"
+hyper = { version = "1", features = ["full"] }
+# V233 SECURITY: RUSTSEC-2025-0132 — `Reader::open_mmap` unsoundly marks an
+# unsafe memmap operation as safe. Fixed in maxminddb >=0.27, but 0.25→0.27
+# is a breaking API change to the GeoIP reader (affects src/geoip.rs call
+# sites). Held at 0.24 to keep the build green; follow-up required: bump to
+# "0.27" and migrate geoip.rs in a dedicated change.
+maxminddb = "0.24"
+hyper-util = { version = "0.1", features = ["tokio", "server", "http1", "http2", "client-legacy"] }
+libc = "0.2"
+mlua = { version = "0.10", features = ["lua54", "vendored", "send", "serialize"] }
+wasmi = "0.40"
+quinn = { version = "0.11", default-features = false, features = ["runtime-tokio", "rustls", "ring"] }
+socket2 = { version = "0.5", features = ["all"] }
+rand = "0.8"
+redis = { version = "0.27", features = ["tokio-comp"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+rustls-pemfile = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# V233 SECURITY: RUSTSEC-2025-0068 (serde_yml unsound + unmaintained) and
+# RUSTSEC-2025-0067 (its `libyml` backend — `yaml_string_extend` is unsound).
+# 0.0.12 is the latest release; no fixed/patched version exists. Follow-up
+# required: migrate config parsing to a maintained YAML crate (e.g.
+# `serde_yaml_ng` or `serde-yaml-bw`), which is a breaking dependency swap.
+serde_yml = "0.0.12"
+sha2 = "0.10"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+toml = "0.8"
+# V229 — strip debug!/trace! macros at compile-time in release builds.
+# Hot path had 19 debug-level callsites that still paid ~20-40 ns of
+# callsite-cache lookup each even when the EnvFilter blocked them.
+# `release_max_level_info` makes them dead code, recovering ~50-95 MB/s
+# of dispatch overhead at 100k+ RPS.
+tracing = { version = "0.1", features = ["release_max_level_info"] }
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter", "json"] }
+urlencoding = "2"
+uuid = { version = "1", features = ["v4"] }
+aho-corasick = "1"
+# SECURITY (C4) — gzip/deflate decompression of request bodies BEFORE
+# WAF signature inspection. Without this a `Content-Encoding: gzip`
+# body let an attacker smuggle any signature past `inspect_body` (which
+# scanned the raw, still-compressed bytes). Decompression is bounded by
+# the operator's `max_decompress_ratio` + `max_body_bytes` so it can't
+# be turned into a decompression-bomb DoS. Only gzip + deflate are
+# supported; brotli (`br`) and any unknown encoding FAIL CLOSED (deny).
+flate2 = "1"
+# V230 — SIMD byte search (NEON on aarch64, AVX2 on x86_64). Used by
+# the WAF canonicalisation pass and per-field substring scans to
+# replace scalar `str::contains` loops.
+memchr = "2"
+# V230 — FxHash for internal-only maps where keys are NOT attacker-
+# controlled (compile-time literals, rule IDs, status codes, frame
+# kinds). 3-5× faster than SipHash on small keys. Adversary-controlled
+# maps (IP, host, JA4) keep AHash/SipHash for DoS resistance.
+rustc-hash = "2"
+# V230 — coarse-resolution Instant. ~10ms tick, ~3ns load. Used by
+# the background aggregators (dynamic_trust window aging, scorer
+# record, anomaly EMA) where 1-10ms skew is invisible. Real
+# `Instant::now()` is retained for latency histograms + security-
+# sensitive token expiry where monotonic precision matters.
+coarsetime = "0.1"
+# V124 — Cloudflare's wirefilter expression engine. Compositional WAF
+# DSL: `http.request.method eq "POST" and starts_with(http.request.path,
+# "/api") and not ip.src in $trusted`. Replaces our flat WafRule shape
+# for operators who want CRS-class expressiveness.
+# V233 SECURITY: wirefilter-engine 0.6.1 (last release, 2019) transitively
+# pulls the deprecated `failure` crate, flagged by RUSTSEC-2020-0036
+# (unmaintained) and RUSTSEC-2019-0036 (unsound — type confusion via
+# `__private_get_type_id__`, CVSS 9.8). No fixed wirefilter-engine release
+# exists. Follow-up required (upstream-blocked): migrate to the maintained
+# `wirefilter` engine from cloudflare/wirefilter, or vendor a `failure`-free
+# fork — a breaking dependency swap.
+wirefilter-engine = "0.6"
+# V126 — x509-parser for JA4X cert fingerprint (Synapse parity).
+x509-parser = "0.16"
+# V234 — concrete ACME protocol driver. Implements the AcmeClient trait
+# in src/acme_instant.rs. Features: `ring` (crypto backend matching the
+# rest of the codebase) + `hyper-rustls` (HTTP transport) + `rcgen`
+# (CSR generation inside Order::finalize). `aws-lc-rs` (the default
+# crypto backend) is disabled because we standardise on `ring` to avoid
+# two crypto backends in the same binary.
+instant-acme = { version = "0.8", default-features = false, features = ["ring", "hyper-rustls", "rcgen"] }
+mimalloc = { version = "0.1", default-features = false }
+# V233 SECURITY: RUSTSEC-2026-0002 — `IterMut` violates Stacked Borrows by
+# invalidating an internal pointer. Fixed in lru >=0.16.3, but that is a
+# cross-minor (0.x) bump, i.e. semver-breaking. The Aegis call site
+# (src/proxy/response_cache.rs) only uses new/peek/pop, which are unaffected
+# by the API changes, so the bump is likely safe — but it must be verified
+# with a full build. Follow-up required: bump to "0.16" (>=0.16.3) and
+# confirm response_cache.rs compiles. Note: ratatui 0.29 also pulls lru
+# 0.12.5 transitively (same advisory) — resolved only when ratatui bumps.
+lru = "0.13"
+# V241 — flood-capacity benchmark needs a throwaway self-signed cert for the
+# loopback TLS-handshake-flood scenario. Pin to the same 0.14 that instant-acme
+# already pulls in (ring backend, no aws-lc-rs) so we add no new build cost and
+# no second crypto backend.
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "pem", "ring"] }
+arc-swap = "1"
+# V243 — persistent request/event log store (src/event_store.rs). SQLite via
+# rusqlite with the `bundled` feature so we compile libsqlite from source
+# (no system libsqlite dependency) and it cross-builds cleanly on the Debian
+# stand. Each SO_REUSEPORT worker owns its own shard-<slot>.db (WAL mode,
+# single writer per process => zero cross-process write contention); the admin
+# read side ATTACHes every shard and UNION ALLs across them, mirroring the
+# site_map shard model.
+rusqlite = { version = "0.32", features = ["bundled"] }
+# Phase B foundation — Pingora deps live under the `pingora` feature so
+# the default build stays slim. V50: switched from rustls → openssl
+# feature. Pingora-rustls hard-codes `ServerConfig::with_single_cert`
+# and has no public hook for ResolvesServerCert / ClientHello bytes
+# (see TlsSettings::with_callbacks → "not supported with feature
+# 'rustls'"). The openssl backend wires the same `TlsAccept` trait
+# BoringSSL exposes — per-SNI cert routing + JA3/JA4 capture both
+# unblocked. Build cost: `libssl-dev` on Debian/Ubuntu, `openssl@3`
+# via Homebrew on macOS — both already present on every Linux distro
+# and standard CI image.
+# V233 SECURITY: pingora-core 0.8 transitively pulls protobuf 2.28.0 (via
+# prometheus 0.13), flagged by RUSTSEC-2024-0437 — uncontrolled recursion
+# crash; fix is protobuf >=3.7.2. Also drags in unmaintained `daemonize`
+# (RUSTSEC-2025-0069) and `derivative` (RUSTSEC-2024-0388). All three are
+# transitive and cannot be resolved here. Follow-up required (upstream-
+# blocked): bump pingora when a 0.9+ release moves prometheus/protobuf
+# forward; gating only matters under the `pingora` feature.
+pingora-core = { version = "0.8", default-features = false, features = ["openssl"], optional = true }
+pingora-proxy = { version = "0.8", default-features = false, features = ["openssl"], optional = true }
+pingora-http = { version = "0.8", optional = true }
+async-trait = "0.1"
+# OpenSSL via the openssl crate — pingora's openssl feature pulls it
+# transitively, but we depend directly so our TlsAccept impl can use
+# the SSL accessors (SSL_use_certificate, client_hello_get_extensions,
+# etc.) without going through pingora's re-export. openssl-sys gives
+# us raw FFI for the `SSL_client_hello_get1_extensions_present` /
+# `SSL_client_hello_get0_ext` calls the high-level crate doesn't
+# wrap; foreign-types-shared brings `ForeignTypeRef::as_ptr` into
+# scope so we can hand the raw SSL pointer to those FFI calls.
+openssl = { version = "0.10", optional = true }
+openssl-sys = { version = "0.9", optional = true }
+foreign-types-shared = { version = "0.1", optional = true }
+# V133 — Terminal TUI dashboard. ratatui is a pure-Rust ncurses
+# alternative (used by bottom, gitui, helix). crossterm is the
+# cross-platform terminal backend (alt-screen, raw mode, key events).
+# Both are zero-runtime-impact when the TUI binary isn't launched.
+ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
+crossterm = "0.28"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+aya = { version = "0.13", optional = true }
+aya-log = { version = "0.2", optional = true }
+aegis-xdp-common = { path = "xdp/aegis-xdp-common", features = ["std"] }
+
+[[bin]]
+name = "aegis-pingora"
+path = "src/bin/aegis-pingora.rs"
+required-features = ["pingora"]
+
+[[bin]]
+name = "aegis-pingora-e2e"
+path = "src/bin/aegis-pingora-e2e.rs"
+required-features = ["pingora"]
+
+# V105 — distributed-attacker bench client. Binds each connection to a
+# distinct loopback IP alias so a single bench host can simulate N
+# attackers against the cluster scorer + REUSEPORT layout without
+# needing PROXY protocol support on the listener.
+[[bin]]
+name = "aegis-distbench"
+path = "src/bin/aegis-distbench.rs"
+
+# V118 — sqlmap evasion replay harness. Operator points at a running
+# Aegis (or any target URL); it tries 15 canonical sqlmap tampers on a
+# known SQLi payload and reports which the WAF caught vs bypassed.
+[[bin]]
+name = "aegis-sqlmap-replay"
+path = "src/bin/aegis-sqlmap-replay.rs"
+
+# V196 — Sigma rule importer. Converts SigmaHQ community detection
+# rules (logsource.category: webserver) to Aegis WafRule TOML format.
+[[bin]]
+name = "aegis-sigma-import"
+path = "src/bin/aegis-sigma-import.rs"
+
+# V212 — update applier. Spawned by the daemon to download, verify,
+# install, activate, restart, health-probe, and (on failure) revert
+# a new release without the daemon having to exec itself.
+[[bin]]
+name = "aegis-updater"
+path = "src/bin/aegis-updater.rs"
+
+[dev-dependencies]
+serde_json = "1"
+tokio = { version = "1", features = ["full", "test-util"] }
+wat = "1"
+
+# V230 — release profile tuning. Cargo defaults to opt-level=3 but
+# leaves lto=false / codegen-units=16 / panic=unwind. For an edge
+# proxy where the hot path crosses 5-7 crate boundaries (pingora,
+# hyper, http, tokio, our 80+ modules) `lto="fat"` + `codegen-units=1`
+# typically buys 5-15% throughput on Rust async network code. The
+# benchmarks for haproxy/nginx/Pingora are all built with full LTO;
+# matching that gives us an apples-to-apples comparison baseline.
+#
+# `panic="abort"` shrinks the binary, removes unwind tables from every
+# function prologue (icache savings on the Allow hot path), and is
+# safe because the proxy already treats any panic as a worker crash —
+# pingora restarts the worker, REUSEPORT keeps the listener alive.
+# `strip = "symbols"` removes ~30% of the binary size; debug symbols
+# can still be retrieved from the .dwp split-debug file when needed.
+# V246 — BUILD SPEED. The V230 `lto="fat"` + `codegen-units=1` above produced the
+# fastest *binary* but a fully SINGLE-THREADED *build*: one rustc pegged one core
+# for minutes on every `install.sh --update`, leaving the other cores idle. Since
+# install.sh recompiles ON the server on every update, the default is now a
+# PARALLEL, incremental build that saturates all cores and only recompiles changed
+# code. `codegen-units=16` lets LLVM codegen run across cores; `thin` LTO is
+# parallel (vs fat = one serial whole-program pass); `incremental=true` makes a
+# small --update recompile a fraction of the crate instead of all of it. Runtime
+# cost vs fat+cgu=1 is a few % (measured: AEGIS+WAF still out-throughputs bare
+# nginx). For a MAX-optimized release build, run install.sh with AEGIS_BUILD_OPT=max
+# (it exports CARGO_PROFILE_RELEASE_{LTO=fat,CODEGEN_UNITS=1,INCREMENTAL=false}).
+[profile.release]
+lto = "thin"
+codegen-units = 16
+incremental = true
+panic = "abort"
+strip = "symbols"
+opt-level = 3
+debug = false
+
+# `[profile.profiling]` mirrors release (fat LTO, cgu=1, opt-level 3) but
+# keeps the symbol table + line numbers so `perf` / flamegraphs resolve
+# function names. Never shipped — used only for performance investigation.
+[profile.profiling]
+inherits = "release"
+lto = "thin"
+strip = false
+debug = 1
+
+# `[profile.bench]` mirrors release so micro-benches reflect real
+# production performance, not unoptimised-debug noise.
+[profile.bench]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+opt-level = 3
+debug = true  # keep symbols for `cargo flamegraph` / perf annotate

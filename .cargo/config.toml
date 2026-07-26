@@ -1,0 +1,26 @@
+# Cargo configuration.
+#
+# ── CPU codegen tuning — DELIBERATELY NOT hardcoded here ─────────────────────
+#
+# We do NOT pin `target-cpu`/`target-feature` in this committed config on
+# purpose. Forcing e.g. `+lse` (ARMv8.1 atomics) or `+avx2` would make a plain
+# `cargo build` emit instructions that FAULT with SIGILL on any older CPU that
+# lacks them — ARMv8.0 boards (Raspberry Pi 4, Cortex-A53/A72, some budget ARM
+# VPS) for `+lse`, pre-2009 x86 for SSE4.2/AVX. A committed config applies to
+# every `cargo build` everywhere (CI, cross-compiles, distro packagers,
+# `cargo install`), so hardcoding features is a portability footgun.
+#
+# Instead, AEGIS is built FROM SOURCE on the deploy host by `install.sh`, which
+# sets `RUSTFLAGS="-C target-cpu=native"` (override: `AEGIS_TARGET_CPU=...`).
+# `native` detects the exact CPU at build time and enables every feature it has
+# — LSE single-instruction atomics on modern ARM (Graviton2+, Ampere, Apple
+# M-series, Neoverse), AVX2/BMI on modern x86 — with ZERO portability risk,
+# because the binary only ever runs on the machine that compiled it.
+#
+# To build an optimized binary by hand (same effect as the installer):
+#     RUSTFLAGS="-C target-cpu=native" cargo build --release --features pingora
+# To build a portable binary for build-once-deploy-to-many-CPUs:
+#     AEGIS_TARGET_CPU=generic ./install.sh        # or just omit the flag
+#
+# A plain `cargo build` with no RUSTFLAGS uses rustc's conservative baseline
+# (`generic`) and runs on any CPU of that architecture — the safe default.

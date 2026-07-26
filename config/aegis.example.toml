@@ -1,0 +1,177 @@
+[server]
+listen = "0.0.0.0:8080"
+request_timeout_ms = 10000
+graceful_shutdown_secs = 10
+# PROXY protocol mode for recovering real client IP when behind a L4
+# load balancer (AWS NLB, HAProxy, IPVS-DR). Values: "off" (default),
+# "v1" (text), "v2" (binary), "auto" (either). MUST match what the LB
+# sends — strict modes reject mismatched traffic.
+proxy_protocol = "off"
+
+[admin]
+listen = "127.0.0.1:9090"
+# Optional JSON-lines audit log; one entry per /admin/* request.
+# audit_log_path = "aegis-audit.log"
+# Multiple tokens with per-role access. AEGIS_ADMIN_TOKEN env var still
+# works as a single implicit Admin token (back-compat).
+# [[admin.tokens]]
+# token = "READ_ONLY_SECRET"
+# role = "read"
+# [[admin.tokens]]
+# token = "OPERATOR_SECRET"
+# role = "write"
+# [[admin.tokens]]
+# token = "ADMIN_SECRET"
+# role = "admin"
+
+[storage]
+redis_url = "redis://127.0.0.1:6379"
+
+# GeoIP country filter. Drop traffic from listed countries before
+# spending any CPU on filters/upstream. Requires a MaxMind GeoLite2-
+# Country .mmdb file (free, sign up at maxmind.com).
+# [geoip]
+# db_path = "/etc/aegis/GeoLite2-Country.mmdb"
+# deny_countries = ["RU", "KP", "IR"]
+# attack_mode_only = false   # true = only enforce while anomaly detector trips
+
+# Per-domain traffic anomaly detector. When current RPS > baseline *
+# multiplier the domain is flagged "under attack" for
+# attack_duration_secs. While flagged: GeoIP attack_mode_only kicks
+# in, and the challenge ladder is escalated to min_challenge_level
+# for unverified requests.
+# [anomaly]
+# enabled = true
+# window_secs = 10              # sliding window for current RPS
+# multiplier = 3.0              # current >= baseline * 3 trips attack
+# min_baseline_rps = 10.0       # ignore until baseline crosses this
+# attack_duration_secs = 60     # flag stays for 60s after the spike
+# min_challenge_level = "javascript"  # headers|html|iframe|javascript|captcha
+
+[tls]
+enabled = false
+listen = "0.0.0.0:8443"
+cert_path = "certs/server.crt"
+key_path = "certs/server.key"
+# HTTP/3 over QUIC (UDP). When enabled, h1/h2 responses gain an
+# `Alt-Svc: h3=":<port>"; ma=86400` header so clients upgrade
+# automatically on the next request. Defaults to tls.listen port.
+h3_enabled = false
+h3_listen = "0.0.0.0:8443"
+# JA3 deny list — MD5 fingerprints from threat-intel feeds (abuse.ch
+# SSL Blacklist etc.). Matching ClientHellos get the TCP socket closed
+# before key exchange, saving CPU on known attack tools (curl, Go
+# default, sqlmap, Burp, etc. all have stable JA3 hashes).
+# ja3_deny_hashes = [
+#   "e7d705a3286e19ea42f587b344ee6865",  # standard tor browser
+#   "6734f37431670b3ab4292b8f60f29984",  # sqlmap
+# ]
+
+# Per-SNI certificate overrides. The cert/key above is the default
+# returned when no SNI entry matches (or the client sent no SNI).
+# [[tls.sni]]
+# host = "api.example.com"
+# cert_path = "certs/api.crt"
+# key_path  = "certs/api.key"
+# [[tls.sni]]
+# host = "admin.example.com"
+# cert_path = "certs/admin.crt"
+# key_path  = "certs/admin.key"
+
+[upstream]
+url = "http://127.0.0.1:3000"
+
+[filters]
+default_action = "allow"
+
+[filters.ip_acl]
+deny = ["192.0.2.1"]
+allow = []
+
+[filters.rate_limit]
+enabled = true
+requests_per_second = 50
+burst = 100
+# Subnet aggregation: also apply rate limits to the /24 (or /48 for v6)
+# and /16 (or /32) prefix of the client IP. Defeats botnets that pivot
+# between many IPs in the same provider allocation. Multipliers scale
+# the per-IP budget so legit NAT pools aren't false-positived.
+subnet_buckets = true
+subnet_24_multiplier = 8
+subnet_16_multiplier = 64
+# Hot URI auto-detection: log a warning when one path crosses this
+# many requests/sec from any client. 0 disables. Observe-only — see
+# GET /admin/hot_uris for the top 20.
+hot_uri_rps_threshold = 100
+
+# Per-URI rate-limit overrides. First match wins. Exact path or
+# `prefix*` glob. Use to cap expensive endpoints (login, /api/search)
+# tighter than the global default.
+# [[filters.rate_limit.uri_budgets]]
+# pattern = "/login"
+# requests_per_second = 5
+# burst = 10
+# [[filters.rate_limit.uri_budgets]]
+# pattern = "/api/expensive/*"
+# requests_per_second = 10
+# burst = 20
+
+[filters.adaptive]
+enabled = true
+suspicious_rps_threshold = 200
+penalty_seconds = 10
+
+[filters.challenge]
+enabled = true
+token_ttl_secs = 300
+hmac_secret = "replace_with_long_random_secret"
+# Behavioural-fingerprint cookie TTL. After a successful JS challenge
+# the browser computes a canvas+navigator+screen fingerprint; we sign
+# it into aegis_fp and the cookie short-circuits the ladder for the
+# whole TTL. 0 disables the long-lived cookie entirely. Default 86400.
+fp_ttl_secs = 86400
+
+[filters.waf]
+enabled = true
+max_body_bytes = 65536
+# External rule files (TOML with `[[rules]]` entries). Reloaded by
+# POST /admin/reload. Combine with inline `custom_rules` below.
+rule_files = ["config/waf-rules.example.toml"]
+# Skip built-in signature categories that produce false positives in
+# your environment. Valid: "sqli", "xss", "cmdi".
+disable_signatures = []
+
+[[filters.waf.custom_rules]]
+id = "block-admin-probe"
+field = "path"
+op = "contains"
+value = "/wp-admin"
+action = "deny"
+
+[filters.bot]
+enabled = true
+challenge_score = 60
+deny_score = 90
+penalty_seconds = 60
+
+# eBPF/XDP L4 fast-path. Linux-only; requires the `xdp` cargo feature,
+# CAP_BPF + CAP_NET_ADMIN, and a precompiled BPF object built from
+# xdp/aegis-xdp-ebpf with:
+#   cargo +nightly build --release --manifest-path xdp/aegis-xdp-ebpf/Cargo.toml
+# Disabled by default — leave commented out unless you need it.
+# [xdp]
+# enabled = true
+# interface = "eth0"
+# bpf_object_path = "xdp/aegis-xdp-ebpf/target/bpfel-unknown-none/release/aegis-xdp"
+# # IPs that bypass deny + rate-limit. With allow_only = true, ONLY
+# # these IPs reach userspace ("whitelist mode" / closed maintenance).
+# allow = ["192.0.2.10", "192.0.2.11"]
+# allow_only = false
+# # Per-IPv4 kernel rate limiter. Both must be > 0 to activate. Drops
+# # any source IP exceeding `rate_burst` packets per `rate_window_ms`.
+# rate_window_ms = 1000
+# rate_burst = 10000
+# # Dedicated SYN-flood guard: counts only TCP SYN-without-ACK packets
+# # in a separate kernel bucket. Real connection attempts can be capped
+# # tightly without throttling already-established traffic. 0 disables.
+# syn_burst = 200

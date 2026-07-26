@@ -1,0 +1,78 @@
+{
+  "title": "Журнал",
+  "description": "Журнал решений по каждому запросу. Каждый проксированный запрос и то, как Aegis его обработал — действие, причина, статус, задержка и отпечаток клиента.",
+  "live": "В реальном времени",
+  "paused": "Приостановлено",
+  "pause": "Пауза",
+  "resume": "Возобновить",
+  "filterTitle": "Фильтр",
+  "filterPlaceholder": "Фильтр по пути, узлу или методу…",
+  "filterAria": "Фильтр журнала",
+  "result_one": "{{count}} результат по запросу {{query}}",
+  "result_few": "{{count}} результата по запросу {{query}}",
+  "result_many": "{{count}} результатов по запросу {{query}}",
+  "entriesTitle": "Записи",
+  "entriesDescription": "Журнал запросов — сначала самые свежие события.",
+  "entriesCount_one": "{{count}} запись",
+  "entriesCount_few": "{{count}} записи",
+  "entriesCount_many": "{{count}} записей",
+  "emptyTitle": "Записей нет",
+  "emptyDescription": "Под текущие фильтры не попал ни один запрос, либо журнал запросов не настроен.",
+  "col.when": "Когда",
+  "col.method": "Метод",
+  "col.path": "Путь",
+  "col.peer": "Узел",
+  "col.role": "Роль",
+  "col.status": "Статус",
+  "columns": {
+    "time": "Время",
+    "host": "Домен",
+    "method": "Метод",
+    "path": "Путь",
+    "status": "Статус",
+    "action": "Действие",
+    "reason": "Причина",
+    "ip": "IP клиента",
+    "country": "Страна",
+    "latency": "Задержка"
+  },
+  "filters": {
+    "domain": "Домен",
+    "domainPlaceholder": "Все домены",
+    "endpoint": "Эндпоинт",
+    "endpointPlaceholder": "Любой эндпоинт",
+    "action": "Действие",
+    "actionPlaceholder": "Любое действие",
+    "ip": "IP клиента",
+    "ipPlaceholder": "Любой IP",
+    "search": "Поиск",
+    "searchPlaceholder": "Поиск по пути, User-Agent, причине…",
+    "period": "Период"
+  },
+  "actions": {
+    "apply": "Применить",
+    "reset": "Сбросить",
+    "export": "Экспорт"
+  },
+  "period": {
+    "1h": "Последний час",
+    "6h": "Последние 6 часов",
+    "24h": "Последние 24 часа",
+    "7d": "Последние 7 дней",
+    "30d": "Последние 30 дней"
+  },
+  "range": {
+    "live": "В реальном времени",
+    "historical": "За период",
+    "custom": "Произвольный период",
+    "from": "С",
+    "to": "По"
+  },
+  "pagination": {
+    "showing": "Показано {{from}}–{{to}} из {{total}}",
+    "prev": "Назад",
+    "next": "Вперёд",
+    "page": "Страница {{page}}",
+    "perPage": "На странице"
+  }
+}

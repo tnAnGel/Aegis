@@ -1,0 +1,18 @@
+{
+  "brand.tagline": "Защищённый прокси",
+  "title": "Вход в панель администратора",
+  "subtitle": "Управление сайтами, фильтрами и конфигурацией.",
+  "email": "Email",
+  "email.placeholder": "admin@example.com",
+  "password": "Пароль",
+  "password.show": "Показать пароль",
+  "password.hide": "Скрыть пароль",
+  "error.invalidCredentials": "Неверный email или пароль.",
+  "error.generic": "Не удалось войти ({{status}}).",
+  "error.network": "ошибка сети",
+  "signIn": "Войти",
+  "signingIn": "Вход…",
+  "forgot.prefix": "Забыли пароль? Выполните",
+  "forgot.suffix": "на сервере.",
+  "footer.tagline": "AEGIS — Ваш трафик. Ваши правила."
+}

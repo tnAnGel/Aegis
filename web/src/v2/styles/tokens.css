@@ -1,0 +1,427 @@
+/*
+ * V2 DESIGN TOKENS
+ * =================
+ * Applied when <html data-theme="v2"> is set.
+ *
+ * Palette brief:
+ *   - Background: near-black with a deep teal/navy tint (darker + bluer than V1)
+ *   - Card surfaces: dark teal-navy elevation above the background
+ *   - Accent = bright green (#22d362) — "live signal" / success / active
+ *   - Threat severity:
+ *       CRITICAL → red   (--destructive)
+ *       HIGH     → amber (--warning)
+ *       MEDIUM   → yellow (--v2-medium)
+ *       LOW      → sky-blue (--v2-low)
+ *   - Typography: tabular-nums on KPI numbers, uppercase tracking-wider on labels
+ *   - Cards: rounded-xl, 1px border, 0 24px soft box-shadow
+ *
+ * All values are HSL triples (H S% L%) to match the shadcn/ui token convention
+ * used by tailwind.config.ts:
+ *   color: hsl(var(--token))
+ *
+ * -------------------------------------------------------------------------
+ * COLOUR DERIVATION NOTES
+ * -------------------------------------------------------------------------
+ * background  210 28% 6%    — #090f18, deepest layer, near-black with navy cast
+ * card        210 26% 9%    — #0d1520, cards float 3pt above background
+ * popover     210 25% 11%   — #111d2b, tooltips/dropdowns sit above cards
+ * border      210 22% 16%   — #1a2740, 1px separator, subtle
+ * input       210 22% 14%   — #162236, form fields slightly deeper than border
+ *
+ * foreground       210 40% 92%   — #d6e4f7, crisp near-white with blue cast
+ * card-foreground  same
+ * muted            210 24% 14%   — #152034, low-emphasis surface
+ * muted-foreground 210 18% 55%   — #7a90ab, secondary text / labels
+ *
+ * primary (#22d362 — bright green, HSL 141 70% 48%)
+ * primary-foreground  0 0% 4%    — near-black on green
+ *
+ * destructive  0 72% 56%   — #e53935, CRITICAL red
+ * warning      35 92% 54%  — #f59228, HIGH amber
+ * success      141 70% 48% — same as primary (green = success / LOW)
+ *
+ * V2-specific custom properties (not in tailwind.config, used by inline styles):
+ *   --v2-severity-critical  0   72% 56%
+ *   --v2-severity-high     35   92% 54%
+ *   --v2-severity-medium   48   95% 54%
+ *   --v2-severity-low     210   80% 60%
+ *
+ * Card shadow recipe:
+ *   box-shadow: 0 0 0 1px hsl(var(--border)), 0 24px 40px -8px hsl(210 28% 4% / 0.60);
+ */
+
+:root[data-theme="v2"] {
+    /* ── Backgrounds ─────────────────────────────────────────────────── */
+    --background:  210 28%  6%;   /* #090f18  deepest layer             */
+    --foreground:  210 40% 92%;   /* #d6e4f7  primary text              */
+
+    --card:        210 26%  9%;   /* #0d1520  card surface              */
+    --card-foreground: 210 40% 92%;
+
+    --popover:     210 25% 11%;   /* #111d2b  dropdowns / tooltips      */
+    --popover-foreground: 210 40% 92%;
+
+    /* ── UI surfaces ─────────────────────────────────────────────────── */
+    --secondary:   210 24% 13%;   /* #122030  secondary buttons / chips */
+    --secondary-foreground: 210 40% 92%;
+
+    --muted:       210 24% 13%;   /* #122030  low-emphasis surface      */
+    --muted-foreground: 210 18% 55%; /* #7a90ab  section labels / sub-text */
+
+    --accent:      210 24% 16%;   /* #172741  hover tint                */
+    --accent-foreground: 210 40% 92%;
+
+    /* ── Borders / inputs ────────────────────────────────────────────── */
+    --border:      210 22% 16%;   /* #1a2740  card border               */
+    --input:       210 22% 14%;   /* #162236  form fields               */
+    --ring:        141 70% 48%;   /* green focus ring matches primary   */
+
+    /* ── Primary — bright green accent ───────────────────────────────── */
+    /* HSL for #22d362 ≈ hsl(141 70% 48%) */
+    --primary:     141 70% 48%;
+    --primary-foreground: 0 0% 4%;  /* near-black on green              */
+
+    /* ── Semantic intent colours ─────────────────────────────────────── */
+    /* destructive = CRITICAL red (#e53935) */
+    --destructive:           0 72% 56%;
+    --destructive-foreground: 0  0% 98%;
+
+    /* success = LOW / operational green (same hue as primary) */
+    --success:           141 70% 48%;
+    --success-foreground:  0  0% 4%;
+
+    /* warning = HIGH amber (#f59228) */
+    --warning:           35 92% 54%;
+    --warning-foreground: 0  0% 4%;
+
+    /* ── Border radius ───────────────────────────────────────────────── */
+    /* V2 uses rounded-xl cards (12 px) vs V1's 0.6 rem (~9.6 px)       */
+    --radius: 0.75rem;   /* 12 px — maps to rounded-xl in Tailwind       */
+
+    /* ═══════════════════════════════════════════════════════════════════
+     * V2-ONLY custom properties
+     * These are NOT consumed by tailwind.config.ts but are used directly
+     * by V2 components via inline styles or @apply within .v2-* classes.
+     * ══════════════════════════════════════════════════════════════════ */
+
+    /* Threat severity palette ----------------------------------------- */
+    --v2-severity-critical:     0  72% 56%;   /* red    — CRITICAL       */
+    --v2-severity-critical-bg:  0  72% 56%;   /* used at /15 opacity     */
+    --v2-severity-high:        35  92% 54%;   /* amber  — HIGH           */
+    --v2-severity-high-bg:     35  92% 54%;
+    --v2-severity-medium:      48  95% 54%;   /* yellow — MEDIUM         */
+    --v2-severity-medium-bg:   48  95% 54%;
+    --v2-severity-low:        210  80% 60%;   /* sky    — LOW            */
+    --v2-severity-low-bg:     210  80% 60%;
+
+    /* Card chrome ----------------------------------------------------- */
+    /* Use these values to construct the card shadow in JSX:
+         style={{ boxShadow: "var(--v2-card-shadow)" }}                 */
+    --v2-card-shadow:
+        0 0 0 1px hsl(210 22% 16%),
+        0 24px 40px -8px hsl(210 28% 4% / 0.60);
+
+    /* Sidebar --------------------------------------------------------- */
+    --v2-sidebar-bg:    210 28%  7%;   /* slightly warmer than background */
+    --v2-sidebar-width: 15rem;         /* 240 px                          */
+
+    /* Active nav item tint — green rail + soft green bg */
+    --v2-nav-active-bg:   141 60% 48%;   /* used at /12 opacity           */
+    --v2-nav-active-text: 141 70% 60%;   /* brighter green for label      */
+
+    /* Top bar --------------------------------------------------------- */
+    --v2-topbar-bg: 210 26%  8%;   /* between background and card        */
+
+    /* Chart series colours (hex, consumed by recharts/SVG directly) --- */
+    /* These CSS custom properties are read via getComputedStyle() or
+       just hard-coded in V2 chart wrappers.                             */
+    --v2-chart-allow:      #22d362;   /* primary green — allowed          */
+    --v2-chart-challenge:  #3b82f6;   /* blue — challenged                */
+    --v2-chart-rate-limit: #f59e0b;   /* amber — rate limited             */
+    --v2-chart-tarpit:     #a855f7;   /* purple — tarpitted               */
+    --v2-chart-deny:       #ef4444;   /* red — denied                     */
+    --v2-chart-rtbh:       #ec4899;   /* pink — RTBH blackholed           */
+}
+
+/* =========================================================================
+ * V2 TYPOGRAPHY UTILITIES
+ * These classes are available globally when data-theme="v2" is set.
+ * They extend the base Tailwind utilities; no new design system needed.
+ * ========================================================================= */
+
+/* KPI big numbers — tabular, no font-feature ligatures */
+:root[data-theme="v2"] .v2-kpi-number {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    letter-spacing: -0.02em;
+}
+
+/* Section header labels — uppercase, spaced, muted */
+:root[data-theme="v2"] .v2-section-label {
+    font-size: 0.65rem;           /* ~10.5 px */
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+}
+
+/* Card chrome — rounded-xl + shadow recipe */
+:root[data-theme="v2"] .v2-card {
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--card));
+    box-shadow: var(--v2-card-shadow);
+}
+
+/* Status pill — "All systems operational" green pill */
+:root[data-theme="v2"] .v2-status-pill-ok {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 9999px;
+    background: hsl(141 70% 48% / 0.15);
+    border: 1px solid hsl(141 70% 48% / 0.35);
+    color: hsl(141 70% 62%);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+:root[data-theme="v2"] .v2-status-pill-warn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 9999px;
+    background: hsl(35 92% 54% / 0.15);
+    border: 1px solid hsl(35 92% 54% / 0.35);
+    color: hsl(35 92% 68%);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+:root[data-theme="v2"] .v2-status-pill-error {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 9999px;
+    background: hsl(0 72% 56% / 0.15);
+    border: 1px solid hsl(0 72% 56% / 0.35);
+    color: hsl(0 72% 72%);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Severity chip fills used by SeverityChip.tsx */
+:root[data-theme="v2"] .v2-chip-critical {
+    background: hsl(var(--v2-severity-critical) / 0.20);
+    border:     1px solid hsl(var(--v2-severity-critical) / 0.40);
+    color:      hsl(var(--v2-severity-critical));
+}
+
+:root[data-theme="v2"] .v2-chip-high {
+    background: hsl(var(--v2-severity-high) / 0.20);
+    border:     1px solid hsl(var(--v2-severity-high) / 0.40);
+    color:      hsl(var(--v2-severity-high));
+}
+
+:root[data-theme="v2"] .v2-chip-medium {
+    background: hsl(var(--v2-severity-medium) / 0.20);
+    border:     1px solid hsl(var(--v2-severity-medium) / 0.40);
+    color:      hsl(var(--v2-severity-medium));
+}
+
+:root[data-theme="v2"] .v2-chip-low {
+    background: hsl(var(--v2-severity-low) / 0.20);
+    border:     1px solid hsl(var(--v2-severity-low) / 0.40);
+    color:      hsl(var(--v2-severity-low));
+}
+
+/* Active nav rail — left-edge green bar */
+:root[data-theme="v2"] .v2-nav-active {
+    position: relative;
+    background: hsl(var(--v2-nav-active-bg) / 0.12);
+    color: hsl(var(--v2-nav-active-text));
+    font-weight: 600;
+}
+
+:root[data-theme="v2"] .v2-nav-active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.25rem;
+    bottom: 0.25rem;
+    width: 3px;
+    border-radius: 0 2px 2px 0;
+    background: hsl(var(--primary));
+}
+
+/* =========================================================================
+ * V2 LAYOUT HELPERS
+ * Grid + utility classes consumed by V2 page components.
+ * ========================================================================= */
+
+/* KPI tile grid — 5-across on xl, collapses on smaller viewports */
+:root[data-theme="v2"] .v2-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+@media (max-width: 1279px) {
+    :root[data-theme="v2"] .v2-kpi-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 767px) {
+    :root[data-theme="v2"] .v2-kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Dashboard main 2-column split — chart (2/3) + events panel (1/3) */
+:root[data-theme="v2"] .v2-dashboard-row {
+    display: grid;
+    grid-template-columns: 1fr 22rem;
+    gap: 1rem;
+    align-items: start;
+}
+
+@media (max-width: 1279px) {
+    :root[data-theme="v2"] .v2-dashboard-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Arsenal / Threat Intel / Attack Types — equal-width 3-column row */
+:root[data-theme="v2"] .v2-three-col {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    align-items: start;
+}
+
+@media (max-width: 1023px) {
+    :root[data-theme="v2"] .v2-three-col {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Sites table + System status — wide table (3/4) + narrow list (1/4) */
+:root[data-theme="v2"] .v2-bottom-row {
+    display: grid;
+    grid-template-columns: 1fr 18rem;
+    gap: 1rem;
+    align-items: start;
+}
+
+@media (max-width: 1023px) {
+    :root[data-theme="v2"] .v2-bottom-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =========================================================================
+ * V2 SPARKLINE HELPERS
+ * ========================================================================= */
+
+/* Fade mask on the trailing edge of sparkline containers */
+:root[data-theme="v2"] .v2-sparkline-fade-mask {
+    -webkit-mask-image: linear-gradient(
+        to right,
+        transparent 0%,
+        black 15%,
+        black 80%,
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to right,
+        transparent 0%,
+        black 15%,
+        black 80%,
+        transparent 100%
+    );
+}
+
+/* Container that clips the sparkline to a fixed height at the bottom of a KPI tile */
+:root[data-theme="v2"] .v2-sparkline-wrapper {
+    position: relative;
+    height: 2.5rem;    /* 40 px — matches Sparkline default height */
+    width: 100%;
+    overflow: hidden;
+    margin-top: auto;  /* push to card bottom when tile is flex-col */
+}
+
+/* =========================================================================
+ * V2 TABLE HELPERS
+ * Used by the Sites Overview table and any other dense data tables.
+ * ========================================================================= */
+
+/* Zebra-free dark table rows with a hover tint */
+:root[data-theme="v2"] .v2-table-row {
+    border-bottom: 1px solid hsl(var(--border));
+    transition: background 120ms ease;
+}
+
+:root[data-theme="v2"] .v2-table-row:hover {
+    background: hsl(var(--accent));
+}
+
+/* Numeric cells — right-aligned, tabular */
+:root[data-theme="v2"] .v2-table-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+}
+
+/* Threat score bar inside the table */
+:root[data-theme="v2"] .v2-threat-bar-track {
+    height: 4px;
+    border-radius: 9999px;
+    background: hsl(var(--muted));
+    overflow: hidden;
+}
+
+:root[data-theme="v2"] .v2-threat-bar-fill {
+    height: 100%;
+    border-radius: 9999px;
+    background: hsl(var(--primary));
+    transition: width 300ms ease;
+}
+
+/* =========================================================================
+ * V2 SCROLLBAR OVERRIDES
+ * Thin, dark-themed scrollbars to match the V2 palette.
+ * ========================================================================= */
+
+:root[data-theme="v2"] ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+:root[data-theme="v2"] ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+}
+
+:root[data-theme="v2"] ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 9999px;
+}
+
+:root[data-theme="v2"] ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+}
+
+/* =========================================================================
+ * V2 MOTION PREFERENCES
+ * Respect prefers-reduced-motion — disable transitions in V2 as well.
+ * ========================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+    :root[data-theme="v2"] .v2-threat-bar-fill,
+    :root[data-theme="v2"] .v2-table-row {
+        transition: none;
+    }
+}

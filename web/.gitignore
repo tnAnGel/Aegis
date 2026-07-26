@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.vite/
+.turbo/
+.env.local
+*.log
+*.tsbuildinfo
+
+# JS lockfile not tracked by this project
+package-lock.json

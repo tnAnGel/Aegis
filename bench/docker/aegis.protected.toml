@@ -1,0 +1,19 @@
+[server]
+listen = "0.0.0.0:8082"
+request_timeout_ms = 10000
+graceful_shutdown_secs = 2
+
+[upstream]
+url = "http://upstream:3000"
+
+[filters]
+default_action = "allow"
+
+[filters.ip_acl]
+deny = []
+allow = []
+
+[filters.rate_limit]
+enabled = true
+requests_per_second = 50
+burst = 100

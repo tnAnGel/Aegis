@@ -1,0 +1,13 @@
+[package]
+name = "aegis-xdp-common"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+# Toggles std-side derives. The BPF program crate disables this; the
+# main aegis loader enables it via the `std` feature.
+std = ["dep:aya"]
+
+[dependencies]
+aya = { version = "0.13", optional = true }

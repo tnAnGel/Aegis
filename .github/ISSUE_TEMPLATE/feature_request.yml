@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest a capability or an improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >
+        What are you trying to do that Aegis makes hard or impossible? Describe
+        the situation, not the solution you have in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like Aegis to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you tried, or how other proxies solve this.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - WAF / rules
+        - Challenge ladder
+        - Rate limiting / DDoS
+        - TLS / fingerprinting
+        - XDP / eBPF
+        - Admin panel / API
+        - Configuration / installer
+        - Documentation
+        - Other
+    validations:
+      required: true

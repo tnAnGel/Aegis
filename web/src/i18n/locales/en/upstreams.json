@@ -1,0 +1,18 @@
+{
+  "title": "Upstreams",
+  "subtitle": "Proxy targets aggregated from your configured sites. This view is read-only — pools are not yet named.",
+  "empty.title": "No upstreams configured",
+  "empty.hint": "Add a site from the Sites page — its proxy target appears here automatically.",
+  "summary.fallback": "Proxy targets aggregated from your configured sites",
+  "summary.line": "{{total}} · {{healthy}} healthy · {{degraded}} degraded",
+  "upstream_one": "{{count}} upstream",
+  "upstream_other": "{{count}} upstreams",
+  "kpi.total": "TOTAL UPSTREAMS",
+  "kpi.healthy": "HEALTHY",
+  "kpi.degraded": "DEGRADED",
+  "pools.title": "UPSTREAM POOLS",
+  "loading": "Loading upstreams…",
+  "col.upstream": "Upstream",
+  "col.usedBy": "Used by hosts",
+  "col.health": "Health"
+}

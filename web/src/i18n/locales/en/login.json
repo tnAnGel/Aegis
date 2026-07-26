@@ -1,0 +1,18 @@
+{
+  "brand.tagline": "Secure Proxy",
+  "title": "Sign in to admin",
+  "subtitle": "Manage sites, filters and runtime config.",
+  "email": "Email",
+  "email.placeholder": "admin@example.com",
+  "password": "Password",
+  "password.show": "Show password",
+  "password.hide": "Hide password",
+  "error.invalidCredentials": "Invalid email or password.",
+  "error.generic": "Login failed ({{status}}).",
+  "error.network": "network error",
+  "signIn": "Sign in",
+  "signingIn": "Signing in…",
+  "forgot.prefix": "Forgot password? Run",
+  "forgot.suffix": "on the server.",
+  "footer.tagline": "AEGIS — Your traffic. Your rules."
+}

@@ -1,0 +1,56 @@
+Aegis — high-performance reverse proxy / edge gateway for DDoS mitigation
+and L7 traffic filtering.
+
+Copyright (C) 2025-2026 Maxim Belyakov <darkzeit00@gmail.com>
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your
+option) any later version. See the LICENSE file for the full text.
+
+Commercial licensing
+--------------------
+Aegis is licensed under the AGPL-3.0. If the AGPL's network-use copyleft
+does not fit your deployment (for example, you want to build a closed-source
+product or a hosted service on top of Aegis), a separate commercial license
+is available from the copyright holder.
+
+    Author:   Maxim Belyakov
+    Email:    darkzeit00@gmail.com
+    Telegram: @Namnes
+
+
+================================================================================
+THIRD-PARTY COMPONENTS
+================================================================================
+
+Aegis bundles or derives from the following third-party material. Their
+licenses apply to those components, not to Aegis as a whole.
+
+1. DB-IP "IP to Country Lite" database
+   File:    data/geoip/dbip-country-lite.mmdb
+   Source:  https://db-ip.com/db/download/ip-to-country-lite
+   License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+   Required attribution:
+       IP geolocation by DB-IP (https://db-ip.com) — CC BY 4.0
+   This attribution is also surfaced in the Aegis admin panel on the
+   GeoIP page.
+
+2. SigmaHQ community detection rules
+   File:    rules/sigma/sigma-webserver.toml (auto-generated)
+   Source:  https://github.com/SigmaHQ/sigma
+   License: Detection Rule License (DRL) 1.1
+            https://github.com/SigmaHQ/sigma/blob/master/LICENSE.Detection.Rules.md
+   The file is a mechanical conversion of upstream Sigma YAML rules into
+   the Aegis WAF rule format, produced by the `aegis-sigma-import` tool.
+   Rule authorship remains with the original Sigma rule authors.
+
+3. Cloudflare Pingora
+   Used as the production data-plane framework (feature `pingora`).
+   Source:  https://github.com/cloudflare/pingora
+   License: Apache License 2.0
+
+4. Rust crate dependencies
+   Aegis links a large number of Rust crates, predominantly under the
+   MIT and/or Apache-2.0 licenses. Run `cargo license` or `cargo about`
+   for a complete, version-accurate inventory of the dependency tree.

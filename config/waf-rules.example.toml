@@ -1,0 +1,43 @@
+# Example external WAF rule file. Reference from aegis.example.toml:
+#   [filters.waf]
+#   rule_files = ["config/waf-rules.example.toml"]
+#
+# Each entry mirrors WafRule:
+#   field: path | method | user_agent | header:<name>
+#   op:    contains | equals | starts_with
+#   action: deny | challenge
+
+[[rules]]
+id = "block-wp-admin"
+field = "path"
+op = "starts_with"
+value = "/wp-admin"
+action = "deny"
+
+[[rules]]
+id = "block-phpmyadmin"
+field = "path"
+op = "contains"
+value = "/phpmyadmin"
+action = "deny"
+
+[[rules]]
+id = "challenge-headless-chrome"
+field = "user_agent"
+op = "contains"
+value = "headlesschrome"
+action = "challenge"
+
+[[rules]]
+id = "deny-env-probe"
+field = "path"
+op = "contains"
+value = "/.env"
+action = "deny"
+
+[[rules]]
+id = "deny-git-probe"
+field = "path"
+op = "contains"
+value = "/.git/"
+action = "deny"

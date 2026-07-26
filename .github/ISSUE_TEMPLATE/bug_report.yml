@@ -1,0 +1,72 @@
+name: Bug report
+description: Something in Aegis does not work as documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not report security vulnerabilities here.** Use the Security tab
+        (private advisory) or email darkzeit00@gmail.com — see SECURITY.md.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Exact steps, request or payload. Minimal is best.
+      placeholder: |
+        1. curl -v 'http://host/...'
+        2. Observe 403 instead of 200
+    validations:
+      required: true
+
+  - type: dropdown
+    id: plane
+    attributes:
+      label: Which data plane?
+      description: The installer deploys aegis-pingora by default.
+      options:
+        - aegis-pingora (default / production)
+        - aegis (legacy hyper binary)
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: "aegis-pingora --version, or the git commit"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS and kernel
+      placeholder: "Debian 12, 6.1.0-18-amd64"
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant configuration
+      description: >
+        The parts of aegis.conf that matter — filters enabled, challenge ladder
+        on or off, XDP on or off. Redact tokens and secrets.
+      render: nginx
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "journalctl -u 'aegis-pingora@*' -n 100 --no-pager"
+      render: shell

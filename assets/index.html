@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Aegis Admin</title>
+    <link rel="stylesheet" href="/admin/ui/style.css">
+</head>
+<body>
+    <header>
+        <div class="brand">
+            <span class="logo">⚡</span>
+            <h1>Aegis</h1>
+            <span class="ver" id="version">edge proxy</span>
+        </div>
+        <nav>
+            <button class="tab active" data-tab="sites">Sites</button>
+            <button class="tab" data-tab="filters">Filters</button>
+            <button class="tab" data-tab="health">Health</button>
+            <button class="tab" data-tab="metrics">Metrics</button>
+            <button class="tab" data-tab="logs">Audit log</button>
+        </nav>
+        <div class="auth">
+            <input id="token" type="password" placeholder="x-admin-token" autocomplete="off">
+            <button id="save-token">Save</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- ───────────────────── Sites tab ───────────────────── -->
+        <section id="tab-sites" class="tab-panel active">
+            <div class="row">
+                <h2>Sites</h2>
+                <button id="add-site-btn" class="primary">+ Add site</button>
+            </div>
+            <p class="hint">
+                Files dropped here become <code>/var/lib/aegis/sites.d/&lt;host&gt;.conf</code>.
+                Aegis auto-reloads after each change. For ops-managed files use
+                <code>/etc/aegis/sites-enabled/*.conf</code> (read-only from this UI).
+            </p>
+            <table class="sites-table">
+                <thead>
+                    <tr>
+                        <th>Host</th>
+                        <th>Upstream</th>
+                        <th>TLS</th>
+                        <th>Rate limit</th>
+                        <th>Source</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="sites-rows">
+                    <tr><td colspan="6" class="empty">Loading…</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- ───────────────────── Filters tab ───────────────────── -->
+        <section id="tab-filters" class="tab-panel">
+            <h2>Global filters</h2>
+            <p class="hint">
+                Filter state is currently <em>read-only from the UI</em> —
+                edit <code>/etc/aegis/aegis.conf</code> <code>defaults &#123; filters &#123; … &#125; &#125;</code>
+                block and run <code>systemctl reload aegis</code> to change. The UI
+                surfaces what's actually active right now.
+            </p>
+            <ul class="filters" id="filters-list">
+                <li class="ph">Loading…</li>
+            </ul>
+        </section>
+
+        <!-- ───────────────────── Health tab ───────────────────── -->
+        <section id="tab-health" class="tab-panel">
+            <h2>Upstream health</h2>
+            <pre id="health-text" class="raw">Loading…</pre>
+
+            <h2 style="margin-top:2rem">Top threats</h2>
+            <pre id="threats-text" class="raw">Loading…</pre>
+
+            <h2 style="margin-top:2rem">Hot URIs</h2>
+            <pre id="hot-uris-text" class="raw">Loading…</pre>
+
+            <h2 style="margin-top:2rem">Anomaly flags</h2>
+            <pre id="anomaly-text" class="raw">Loading…</pre>
+        </section>
+
+        <!-- ───────────────────── Metrics tab ───────────────────── -->
+        <section id="tab-metrics" class="tab-panel">
+            <h2>Live counters</h2>
+            <div class="cards">
+                <div class="card"><span class="k">Total requests</span><span class="v" id="m-total">–</span></div>
+                <div class="card"><span class="k">Denied</span><span class="v" id="m-denied">–</span></div>
+                <div class="card"><span class="k">Challenged</span><span class="v" id="m-challenged">–</span></div>
+                <div class="card"><span class="k">Upstream 5xx</span><span class="v" id="m-5xx">–</span></div>
+            </div>
+            <h3 style="margin-top:1.5rem">Per protocol</h3>
+            <ul class="kv" id="m-proto"></ul>
+            <h3 style="margin-top:1.5rem">Per domain (top 20)</h3>
+            <table class="sites-table">
+                <thead><tr><th>Host</th><th>Total</th><th>Denied</th><th>Challenged</th></tr></thead>
+                <tbody id="m-domains"></tbody>
+            </table>
+            <details style="margin-top:1.5rem">
+                <summary>Raw /metrics</summary>
+                <pre id="raw-metrics" class="raw"></pre>
+            </details>
+        </section>
+
+        <!-- ───────────────────── Audit log tab ───────────────────── -->
+        <section id="tab-logs" class="tab-panel">
+            <h2>Recent audit log</h2>
+            <p class="hint">
+                Streamed from the file Aegis writes via <code>audit_log_path</code>.
+                JSON lines, newest first. Endpoint blocks on a tail of the last 200 entries.
+            </p>
+            <pre id="audit-text" class="raw">Loading…</pre>
+        </section>
+    </main>
+
+    <!-- ───────────────────── Add-site modal ───────────────────── -->
+    <div id="modal" class="modal hidden">
+        <div class="modal-body">
+            <h2 id="modal-title">Add site</h2>
+            <form id="site-form">
+                <label>Hostname
+                    <input name="host" required pattern="[A-Za-z0-9._\-]+" placeholder="api.example.com">
+                </label>
+                <label>Upstream URL
+                    <input name="upstream" required placeholder="http://127.0.0.1:3001">
+                </label>
+                <div class="grid2">
+                    <label>Listen on TLS (443)?
+                        <select name="tls">
+                            <option value="false">no — plain HTTP only</option>
+                            <option value="true">yes</option>
+                        </select>
+                    </label>
+                    <label>HTTP/3 (QUIC)?
+                        <select name="h3">
+                            <option value="false">no</option>
+                            <option value="true">yes (requires TLS)</option>
+                        </select>
+                    </label>
+                </div>
+                <label>TLS cert path (server PEM)
+                    <input name="ssl_cert" placeholder="/etc/aegis/certs/example.crt">
+                </label>
+                <label>TLS key path (PKCS8 PEM)
+                    <input name="ssl_key" placeholder="/etc/aegis/certs/example.key">
+                </label>
+                <div class="grid2">
+                    <label>Per-host requests/sec (0 = use defaults)
+                        <input name="rps" type="number" min="0" value="0">
+                    </label>
+                    <label>Per-host burst (0 = use defaults)
+                        <input name="burst" type="number" min="0" value="0">
+                    </label>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="cancel-btn">Cancel</button>
+                    <button type="submit" class="primary">Save &amp; reload</button>
+                </div>
+            </form>
+            <pre id="modal-preview" class="raw"></pre>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="/admin/ui/app.js" defer></script>
+</body>
+</html>

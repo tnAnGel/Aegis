@@ -1,0 +1,42 @@
+services:
+  upstream:
+    image: hashicorp/http-echo:1.0.0
+    command: ["-listen=:3000", "-text=ok"]
+    ports:
+      - "3000:3000"
+
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      - upstream
+    ulimits:
+      nofile:
+        soft: 200000
+        hard: 200000
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8081:8080"
+      - "8083:8082"
+
+  aegis-transparent:
+    image: rust:latest
+    working_dir: /app
+    depends_on:
+      - upstream
+    volumes:
+      - ../..:/app
+    command: ["sh", "-lc", "/usr/local/cargo/bin/cargo run --release --bin aegis -- --config bench/docker/aegis.transparent.toml start"]
+    ports:
+      - "8080:8080"
+
+  aegis-protected:
+    image: rust:latest
+    working_dir: /app
+    depends_on:
+      - upstream
+    volumes:
+      - ../..:/app
+    command: ["sh", "-lc", "/usr/local/cargo/bin/cargo run --release --bin aegis -- --config bench/docker/aegis.protected.toml start"]
+    ports:
+      - "8082:8082"

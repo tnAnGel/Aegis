@@ -1,0 +1,8 @@
+{
+  "brand.tagline": "Secure Proxy",
+  "title": "Web panel is disabled",
+  "body.before": "An operator ran ",
+  "body.after": ". The UI and JSON API are intentionally returning 503. The proxy itself is unaffected.",
+  "reEnable": "To re-enable, run on the server:",
+  "footer": "AEGIS admin panel — proxy is unaffected by this error."
+}

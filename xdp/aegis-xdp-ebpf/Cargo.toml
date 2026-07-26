@@ -1,0 +1,37 @@
+[workspace]
+
+[package]
+name = "aegis-xdp-ebpf"
+version = "0.1.0"
+edition = "2024"
+
+# Built separately from the main workspace because it targets
+# bpfel-unknown-none and relies on aya's nightly-only toolchain.
+# Build with:
+#   cargo +nightly build --release --target bpfel-unknown-none \
+#       -Z build-std=core --manifest-path xdp/aegis-xdp-ebpf/Cargo.toml
+
+[[bin]]
+name = "aegis-xdp"
+path = "src/main.rs"
+
+[dependencies]
+aya-ebpf = "0.1"
+aya-log-ebpf = "0.1"
+aegis-xdp-common = { path = "../aegis-xdp-common", default-features = false }
+
+[profile.dev]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+lto = true
+panic = "abort"
+incremental = false
+codegen-units = 1
+rpath = false
+
+[profile.release]
+lto = true
+panic = "abort"
+codegen-units = 1

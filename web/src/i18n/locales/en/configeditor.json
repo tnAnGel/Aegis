@@ -1,0 +1,23 @@
+{
+  "title": "Config Editor",
+  "subtitle": "Raw nginx-like DSL. Test before apply — invalid configs never reach runtime.",
+  "unsavedChanges": "Unsaved changes",
+  "inSync": "In sync",
+  "revert": "Revert",
+  "test": "Test",
+  "applyReload": "Apply & reload",
+  "lastTestPassed": "Last Test — Passed",
+  "lastTestFailed": "Last Test — Failed",
+  "configOk": "config ok",
+  "seeErrorBelow": "see error below",
+  "allChecksPassed": "All checks passed",
+  "validationError": "Validation error",
+  "editorTitle": "Aegis Configuration",
+  "editorDescription": "Edit the raw DSL. Syntax highlighting and completions are provided for all Aegis keywords.",
+  "toast.configOk.title": "Config OK",
+  "toast.configInvalid.title": "Config invalid",
+  "toast.testFailed.title": "Test failed",
+  "toast.applied.title": "Applied",
+  "toast.reloadFailed.title": "Reload failed",
+  "toast.applyFailed.title": "Apply failed"
+}

@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="ru" class="scroll-smooth">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AEGIS — DDoS &amp; WAF reverse proxy на Rust</title>
+<meta name="description" content="AEGIS — самостоятельно размещаемый DDoS / WAF реверс-прокси на Rust (Pingora + Hyper). Защита L3-L7, XDP/eBPF, JA3/JA4, ML-движок риска. Self-hosted DDoS & WAF reverse proxy in Rust." />
+<link rel="preconnect" href="https://cdn.tailwindcss.com" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+        },
+        colors: {
+          ink: {
+            900: '#05070a',
+            800: '#0a0e14',
+            700: '#0e131c',
+            600: '#141b27',
+            500: '#1c2533',
+          },
+          brand: {
+            400: '#2dd4bf',
+            500: '#14b8a6',
+            600: '#0d9488',
+          },
+          cyber: {
+            400: '#22d3ee',
+            500: '#06b6d4',
+          },
+        },
+        keyframes: {
+          floaty: { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-10px)' } },
+          pulseGlow: { '0%,100%': { opacity: '0.5' }, '50%': { opacity: '1' } },
+          flow: { '0%': { 'background-position': '0% 50%' }, '100%': { 'background-position': '200% 50%' } },
+        },
+        animation: {
+          floaty: 'floaty 6s ease-in-out infinite',
+          pulseGlow: 'pulseGlow 3s ease-in-out infinite',
+          flow: 'flow 4s linear infinite',
+        },
+      },
+    },
+  };
+</script>
+<style>
+  html, body { background-color: #05070a; }
+  ::selection { background: #14b8a6; color: #05070a; }
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 11px; height: 11px; }
+  ::-webkit-scrollbar-track { background: #0a0e14; }
+  ::-webkit-scrollbar-thumb { background: #1c2533; border-radius: 6px; border: 2px solid #0a0e14; }
+  ::-webkit-scrollbar-thumb:hover { background: #14b8a6; }
+
+  /* Animated hero aurora background */
+  .aurora {
+    position: absolute; inset: 0; overflow: hidden; z-index: 0; pointer-events: none;
+  }
+  .aurora::before, .aurora::after {
+    content: ''; position: absolute; border-radius: 9999px; filter: blur(90px); opacity: 0.45;
+  }
+  .aurora::before {
+    width: 50vw; height: 50vw; top: -10%; left: -5%;
+    background: radial-gradient(circle at center, #14b8a6, transparent 65%);
+    animation: floaty 9s ease-in-out infinite;
+  }
+  .aurora::after {
+    width: 45vw; height: 45vw; bottom: -15%; right: -5%;
+    background: radial-gradient(circle at center, #06b6d4, transparent 65%);
+    animation: floaty 11s ease-in-out infinite reverse;
+  }
+
+  .grid-overlay {
+    position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(45,212,191,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(45,212,191,0.05) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 50%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 50%, transparent 100%);
+  }
+
+  /* Glass card */
+  .glass {
+    background: linear-gradient(160deg, rgba(28,37,51,0.55), rgba(10,14,20,0.55));
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+
+  /* Gradient border on hover */
+  .grad-border {
+    position: relative; transition: transform .35s ease, box-shadow .35s ease;
+  }
+  .grad-border::after {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+    background: linear-gradient(140deg, rgba(45,212,191,0.7), rgba(34,211,238,0.15), transparent 60%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    opacity: 0; transition: opacity .35s ease; pointer-events: none;
+  }
+  .grad-border:hover { transform: translateY(-6px); box-shadow: 0 18px 50px -18px rgba(20,184,166,0.45); }
+  .grad-border:hover::after { opacity: 1; }
+
+  .text-grad {
+    background: linear-gradient(120deg, #2dd4bf 0%, #22d3ee 50%, #2dd4bf 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: flow 6s linear infinite;
+  }
+
+  /* Reveal on scroll */
+  .reveal { opacity: 0; transform: translateY(28px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  .btn-primary {
+    background: linear-gradient(120deg, #14b8a6, #06b6d4);
+    box-shadow: 0 10px 30px -8px rgba(20,184,166,0.6);
+    transition: transform .25s ease, box-shadow .25s ease, filter .25s ease;
+  }
+  .btn-primary:hover { transform: translateY(-2px); filter: brightness(1.08); box-shadow: 0 16px 40px -10px rgba(20,184,166,0.8); }
+
+  .nav-link { position: relative; }
+  .nav-link::after {
+    content: ''; position: absolute; left: 0; bottom: -4px; height: 2px; width: 0;
+    background: linear-gradient(90deg, #2dd4bf, #22d3ee); transition: width .3s ease;
+  }
+  .nav-link:hover::after { width: 100%; }
+
+  /* Flow diagram pipe */
+  .pipe-dot { animation: pulseGlow 2.4s ease-in-out infinite; }
+
+  details > summary { list-style: none; cursor: pointer; }
+  details > summary::-webkit-details-marker { display: none; }
+  details[open] .faq-chevron { transform: rotate(180deg); }
+  .faq-chevron { transition: transform .3s ease; }
+
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body class="font-sans text-slate-300 antialiased selection:text-ink-900">
+
+<!-- ===================== NAV ===================== -->
+<header id="nav" class="fixed top-0 inset-x-0 z-50 transition-all duration-300">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="mt-3 flex items-center justify-between rounded-2xl glass px-4 py-3">
+      <a href="#hero" class="flex items-center gap-2.5 group">
+        <span class="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-cyber-500 shadow-lg shadow-brand-500/30">
+          <svg viewBox="0 0 24 24" class="h-5 w-5 text-ink-900" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 8.6 8 11 4.6-2.4 8-6 8-11V5l-8-3Zm0 2.2 6 2.25V11c0 3.9-2.5 6.9-6 8.8-3.5-1.9-6-4.9-6-8.8V6.45L12 4.2Z"/></svg>
+        </span>
+        <span class="text-lg font-extrabold tracking-tight text-white">AEGIS</span>
+      </a>
+
+      <nav class="hidden lg:flex items-center gap-7 text-sm font-medium text-slate-300">
+        <a href="#features" class="nav-link" data-i18n="nav_features">Возможности</a>
+        <a href="#how" class="nav-link" data-i18n="nav_how">Как работает</a>
+        <a href="#benchmarks" class="nav-link" data-i18n="nav_bench">Бенчмарки</a>
+        <a href="#compare" class="nav-link" data-i18n="nav_compare">Сравнение</a>
+        <a href="#pricing" class="nav-link" data-i18n="nav_pricing">Установка</a>
+        <a href="#faq" class="nav-link" data-i18n="nav_faq">FAQ</a>
+      </nav>
+
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button id="langToggle" class="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-bold text-slate-200 transition hover:border-brand-400/60 hover:text-white">
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+          <span id="langLabel">EN</span>
+        </button>
+        <a href="#pricing" class="btn-primary hidden sm:inline-flex rounded-lg px-4 py-2 text-sm font-bold text-ink-900" data-i18n="nav_cta">Начать</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ===================== HERO ===================== -->
+<section id="hero" class="relative overflow-hidden pt-36 pb-24 sm:pt-44 sm:pb-32">
+  <div class="aurora"></div>
+  <div class="grid-overlay"></div>
+  <div class="relative z-10 mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="mx-auto max-w-4xl text-center">
+      <div class="reveal inline-flex items-center gap-2 rounded-full border border-brand-400/30 bg-brand-500/10 px-4 py-1.5 text-xs font-semibold text-brand-400">
+        <span class="relative flex h-2 w-2"><span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-75"></span><span class="relative inline-flex h-2 w-2 rounded-full bg-brand-400"></span></span>
+        <span data-i18n="hero_badge">Open-source · Rust · Pingora + Hyper</span>
+      </div>
+
+      <h1 class="reveal mt-6 text-4xl font-extrabold leading-[1.08] tracking-tight text-white sm:text-6xl">
+        <span data-i18n="hero_title_1">Защита от DDoS и L7-атак</span><br />
+        <span class="text-grad" data-i18n="hero_title_2">для вашего VPS, на Rust</span>
+      </h1>
+
+      <p class="reveal mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-400" data-i18n="hero_sub">
+        Самостоятельно размещаемый реверс-прокси, который поглощает атаки L3-L7 перед вашим сервисом: WAF, отпечатки TLS (JA3/JA4), ядро-фильтр XDP/eBPF и ML-движок риска — в одном бинарнике.
+      </p>
+
+      <div class="reveal mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <a href="#pricing" class="btn-primary w-full sm:w-auto rounded-xl px-7 py-3.5 text-base font-bold text-ink-900" data-i18n="hero_cta1">Развернуть за 5 минут</a>
+        <a href="#how" class="w-full sm:w-auto rounded-xl border border-white/15 bg-white/5 px-7 py-3.5 text-base font-bold text-white transition hover:border-brand-400/50 hover:bg-white/10" data-i18n="hero_cta2">Документация</a>
+      </div>
+
+      <!-- hero stat counters -->
+      <div class="reveal mt-14 grid grid-cols-3 gap-4 sm:gap-8">
+        <div class="glass rounded-2xl px-3 py-5">
+          <div class="text-2xl sm:text-4xl font-extrabold text-white"><span class="counter" data-target="120">0</span>K<span class="text-brand-400">+</span></div>
+          <div class="mt-1 text-[11px] sm:text-xs font-medium uppercase tracking-wider text-slate-500" data-i18n="hero_stat_rps">RPS форвардинга</div>
+        </div>
+        <div class="glass rounded-2xl px-3 py-5">
+          <div class="text-2xl sm:text-4xl font-extrabold text-white"><span class="counter" data-target="562">0</span></div>
+          <div class="mt-1 text-[11px] sm:text-xs font-medium uppercase tracking-wider text-slate-500" data-i18n="hero_stat_rules">Sigma-правил WAF</div>
+        </div>
+        <div class="glass rounded-2xl px-3 py-5">
+          <div class="text-2xl sm:text-4xl font-extrabold text-white">&lt;<span class="counter" data-target="1">0</span><span class="text-brand-400" data-i18n="unit_ms">мс</span></div>
+          <div class="mt-1 text-[11px] sm:text-xs font-medium uppercase tracking-wider text-slate-500" data-i18n="hero_stat_lat">Накладные задержки</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== TRUST / STATS BAR ===================== -->
+<section class="relative border-y border-white/5 bg-ink-800/40">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 py-10">
+    <div class="grid grid-cols-2 gap-6 md:grid-cols-4 lg:grid-cols-5">
+      <div class="reveal text-center">
+        <div class="text-3xl font-extrabold text-white"><span class="counter" data-target="45">0</span>K</div>
+        <div class="mt-1 text-xs uppercase tracking-wider text-slate-500" data-i18n="trust_tls">RPS с TLS</div>
+      </div>
+      <div class="reveal text-center">
+        <div class="text-3xl font-extrabold text-white"><span class="counter" data-target="28">0</span>K</div>
+        <div class="mt-1 text-xs uppercase tracking-wider text-slate-500" data-i18n="trust_waf">RPS + WAF</div>
+      </div>
+      <div class="reveal text-center">
+        <div class="text-3xl font-extrabold text-white"><span class="counter" data-target="8.8" data-decimals="1">0</span>K</div>
+        <div class="mt-1 text-xs uppercase tracking-wider text-slate-500" data-i18n="trust_hs">TLS-рукопожатий/с</div>
+      </div>
+      <div class="reveal text-center">
+        <div class="text-3xl font-extrabold text-white">L3<span class="text-brand-400">-</span>L7</div>
+        <div class="mt-1 text-xs uppercase tracking-wider text-slate-500" data-i18n="trust_layers">Защита уровней</div>
+      </div>
+      <div class="reveal text-center col-span-2 md:col-span-1">
+        <div class="text-3xl font-extrabold text-white">100<span class="text-brand-400">%</span></div>
+        <div class="mt-1 text-xs uppercase tracking-wider text-slate-500" data-i18n="trust_self">Self-hosted</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== PROBLEM ===================== -->
+<section class="relative py-24">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="reveal mx-auto max-w-2xl text-center">
+      <p class="text-sm font-bold uppercase tracking-widest text-brand-400" data-i18n="prob_kicker">Угрозы</p>
+      <h2 class="mt-3 text-3xl font-extrabold text-white sm:text-4xl" data-i18n="prob_title">Ваш сервер атакуют каждый день</h2>
+      <p class="mt-4 text-slate-400" data-i18n="prob_sub">Боты, флуды и эксплойты не спят. Без выделенного слоя защиты один скрипт-кидди может уронить ваш VPS.</p>
+    </div>
+
+    <div class="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <!-- cards injected by template below -->
+      <div class="reveal grad-border glass rounded-2xl p-6">
+        <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-red-500/10 text-red-400"><svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div>
+        <h3 class="text-lg font-bold text-white" data-i18n="prob_1_t">DDoS L3/L4</h3>
+        <p class="mt-2 text-sm text-slate-400" data-i18n="prob_1_d">SYN-флуды и объёмные атаки забивают канал и исчерпывают сокеты ещё до приложения.</p>
+      </div>
+      <div class="reveal grad-border glass rounded-2xl p-6">
+        <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-orange-500/10 text-orange-400"><svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg></div>
+        <h3 class="text-lg font-bold text-white" data-i18n="prob_2_t">L7-флуды</h3>
+        <p class="mt-2 text-sm text-slate-400" data-i18n="prob_2_d">HTTP/2-флуды и медленные slowloris-соединения выглядят легитимно, но кладут бэкенд.</p>
+      </div>
+      <div class="reveal grad-border glass rounded-2xl p-6">
+        <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400"><svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h.01M15 9h.01M9 15h6"/></svg></div>
+        <h3 class="text-lg font-bold text-white" data-i18n="prob_3_t">Боты и скрейперы</h3>
+        <p class="mt-2 text-sm text-slate-400" data-i18n="prob_3_d">Автоматизация выкачивает контент, цены и данные, маскируясь под обычные браузеры.</p>
+      </div>
+      <div class="reveal grad-border glass rounded-2xl p-6">
+        <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-fuchsia-500/10 text-fuchsia-400"><svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 3v18M5 8l7-5 7 5M5 8v8l7 5 7-5V8"/></svg></div>
+        <h3 class="text-lg font-bold text-white" data-i18n="prob_4_t">Credential stuffing</h3>
+        <p class="mt-2 text-sm text-slate-400" data-i18n="prob_4_d">Перебор украденных паролей по формам входа взламывает аккаунты пользователей.</p>
+      </div>
+      <div class="reveal grad-border glass rounded-2xl p-6">
+        <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-cyber-400/10 text-cyber-400"><svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m7 8-4 4 4 4M17 8l4 4-4 4M14 4l-4 16"/></svg></div>
+        <h3 class="text-lg font-bold text-white" data-i18n="prob_5_t">Инъекции и эксплойты</h3>
+        <p class="mt-2 text-sm text-slate-400" data-i18n="prob_5_d">SQLi, XSS, RCE, Log4Shell, path traversal — один пропущенный запрос компрометирует всё.</p>
+      </div>
+      <div class="reveal grad-border glass rounded-2xl p-6">
+        <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-rose-500/10 text-rose-400"><svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M5 3h14v18l-7-3-7 3V3Z"/><path d="M9 8h6M9 12h6"/></svg></div>
+        <h3 class="text-lg font-bold text-white" data-i18n="prob_6_t">Веб-шеллы</h3>
+        <p class="mt-2 text-sm text-slate-400" data-i18n="prob_6_d">c99, r57, wso, b374k, eval($_POST) — загруженный бэкдор даёт злоумышленнику ваш сервер.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== SOLUTION ===================== -->
+<section class="relative border-y border-white/5 bg-ink-800/30 py-24">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="grid items-center gap-12 lg:grid-cols-2">
+      <div class="reveal">
+        <p class="text-sm font-bold uppercase tracking-widest text-brand-400" data-i18n="sol_kicker">Решение</p>
+        <h2 class="mt-3 text-3xl font-extrabold text-white sm:text-4xl" data-i18n="sol_title">Один щит для всего стека</h2>
+        <p class="mt-5 text-lg leading-relaxed text-slate-400" data-i18n="sol_p1">AEGIS ставится перед любым веб-сервисом или VPS и фильтрует трафик сверху донизу: от пакетов в ядре до тела HTTP-запроса. Атаки отбиваются как можно раньше — самые дешёвые дропаются прямо в ядре через XDP, остальные проходят через WAF, отпечатки TLS и ML-оценку риска.</p>
+        <p class="mt-4 text-lg leading-relaxed text-slate-400" data-i18n="sol_p2">Никаких облачных посредников: трафик никогда не покидает ваш сервер, нет оплаты за каждый запрос. Один бинарник, install.sh, systemd — и вы под защитой.</p>
+        <ul class="mt-7 space-y-3">
+          <li class="flex items-start gap-3"><svg class="mt-0.5 h-5 w-5 flex-none text-brand-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="sol_li1">Фильтрация в ядре до userspace — минимальные накладные расходы</span></li>
+          <li class="flex items-start gap-3"><svg class="mt-0.5 h-5 w-5 flex-none text-brand-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="sol_li2">Самообучаемая репутация JA4 и адаптивная лестница challenge</span></li>
+          <li class="flex items-start gap-3"><svg class="mt-0.5 h-5 w-5 flex-none text-brand-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="sol_li3">Авто-TLS (ACME / Let's Encrypt), HTTP/1.1, HTTP/2 и HTTP/3 (QUIC)</span></li>
+        </ul>
+      </div>
+
+      <div class="reveal">
+        <div class="glass grad-border rounded-2xl p-1.5">
+          <div class="rounded-xl bg-ink-900/80 p-5 font-mono text-sm">
+            <div class="mb-3 flex items-center gap-1.5">
+              <span class="h-3 w-3 rounded-full bg-red-500/80"></span>
+              <span class="h-3 w-3 rounded-full bg-yellow-500/80"></span>
+              <span class="h-3 w-3 rounded-full bg-green-500/80"></span>
+              <span class="ml-2 text-xs text-slate-500">aegis · live</span>
+            </div>
+            <pre class="overflow-x-auto leading-relaxed text-slate-300"><span class="text-slate-500"># <span data-i18n="sol_code_c1">фильтрация в ядре</span></span>
+<span class="text-brand-400">XDP</span>   drop  syn-flood  <span class="text-slate-500">203.0.113.7</span>  <span class="text-red-400">DROPPED</span>
+<span class="text-brand-400">JA4 </span>  rep   <span class="text-slate-500">t13d_curl-impersonate</span>  <span class="text-amber-400">SUSPECT</span>
+<span class="text-brand-400">WAF </span>  sig   <span class="text-slate-500">php-webshell eval($_POST)</span>  <span class="text-red-400">BLOCK</span>
+<span class="text-brand-400">ML  </span>  risk  score=0.94  <span class="text-slate-500">FullEnforce</span>  <span class="text-red-400">CHALLENGE</span>
+<span class="text-brand-400">RATE</span>  /64   <span class="text-slate-500">2001:db8::/64</span>  <span class="text-amber-400">THROTTLE</span>
+<span class="text-brand-400">PASS</span>  upstream  <span class="text-slate-500">10.0.0.5:8080</span>  <span class="text-green-400">200 OK</span>
+<span class="text-slate-500"># <span data-i18n="sol_code_c2">легитимный трафик проходит</span></span></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FEATURES ===================== -->
+<section id="features" class="relative py-24">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="reveal mx-auto max-w-2xl text-center">
+      <p class="text-sm font-bold uppercase tracking-widest text-brand-400" data-i18n="feat_kicker">Возможности</p>
+      <h2 class="mt-3 text-3xl font-extrabold text-white sm:text-4xl" data-i18n="feat_title">Полный арсенал защиты</h2>
+      <p class="mt-4 text-slate-400" data-i18n="feat_sub">Каждый слой работает независимо и усиливает остальные. Всё включено, ничего докупать не нужно.</p>
+    </div>
+
+    <div id="featGrid" class="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3"></div>
+  </div>
+</section>
+
+<!-- ===================== HOW IT WORKS ===================== -->
+<section id="how" class="relative border-y border-white/5 bg-ink-800/30 py-24">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="reveal mx-auto max-w-2xl text-center">
+      <p class="text-sm font-bold uppercase tracking-widest text-brand-400" data-i18n="how_kicker">Конвейер</p>
+      <h2 class="mt-3 text-3xl font-extrabold text-white sm:text-4xl" data-i18n="how_title">Путь запроса сквозь AEGIS</h2>
+      <p class="mt-4 text-slate-400" data-i18n="how_sub">Каждый запрос проходит каскад проверок. Чем дешевле фильтр — тем раньше он стоит.</p>
+    </div>
+
+    <div class="reveal mt-16">
+      <div class="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-2">
+        <!-- step -->
+        <div class="flow-step glass grad-border rounded-2xl p-4 text-center lg:flex-1">
+          <div class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-500/10 text-slate-300"><svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></div>
+          <div class="text-sm font-bold text-white" data-i18n="how_s1_t">Клиент</div>
+          <div class="mt-1 text-xs text-slate-400" data-i18n="how_s1_d">Входящий трафик</div>
+        </div>
+        <div class="flow-arrow hidden lg:block text-brand-400"><svg class="h-6 w-6 pipe-dot" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></div>
+
+        <div class="flow-step glass grad-border rounded-2xl p-4 text-center lg:flex-1">
+          <div class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/10 text-brand-400"><svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M2 12h4l2-6 4 12 2-6h8"/></svg></div>
+          <div class="text-sm font-bold text-white" data-i18n="how_s2_t">XDP / eBPF</div>
+          <div class="mt-1 text-xs text-slate-400" data-i18n="how_s2_d">Дроп в ядре: SYN-флуд, deny-листы</div>
+        </div>
+        <div class="flow-arrow hidden lg:block text-brand-400"><svg class="h-6 w-6 pipe-dot" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></div>
+
+        <div class="flow-step glass grad-border rounded-2xl p-4 text-center lg:flex-1">
+          <div class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-cyber-400/10 text-cyber-400"><svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+          <div class="text-sm font-bold text-white" data-i18n="how_s3_t">TLS / JA4</div>
+          <div class="mt-1 text-xs text-slate-400" data-i18n="how_s3_d">Отпечатки JA3/JA4 + репутация</div>
+        </div>
+        <div class="flow-arrow hidden lg:block text-brand-400"><svg class="h-6 w-6 pipe-dot" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></div>
+
+        <div class="flow-step glass grad-border rounded-2xl p-4 text-center lg:flex-1">
+          <div class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/10 text-brand-400"><svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 8.6 8 11 4.6-2.4 8-6 8-11V5l-8-3Z"/></svg></div>
+          <div class="text-sm font-bold text-white" data-i18n="how_s4_t">WAF</div>
+          <div class="mt-1 text-xs text-slate-400" data-i18n="how_s4_d">Aho-Corasick сигнатуры + тело</div>
+        </div>
+        <div class="flow-arrow hidden lg:block text-brand-400"><svg class="h-6 w-6 pipe-dot" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></div>
+
+        <div class="flow-step glass grad-border rounded-2xl p-4 text-center lg:flex-1">
+          <div class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-cyber-400/10 text-cyber-400"><svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 3v3m0 12v3m9-9h-3M6 12H3m13.5-6.5-2 2m-5 5-2 2m9 0-2-2m-5-5-2-2"/></svg></div>
+          <div class="text-sm font-bold text-white" data-i18n="how_s5_t">Challenge / ML</div>
+          <div class="mt-1 text-xs text-slate-400" data-i18n="how_s5_d">PoW-challenge + оценка риска</div>
+        </div>
+        <div class="flow-arrow hidden lg:block text-brand-400"><svg class="h-6 w-6 pipe-dot" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></div>
+
+        <div class="flow-step glass grad-border rounded-2xl p-4 text-center lg:flex-1">
+          <div class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/10 text-brand-400"><svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="9"/></svg></div>
+          <div class="text-sm font-bold text-white" data-i18n="how_s6_t">Rate limit</div>
+          <div class="mt-1 text-xs text-slate-400" data-i18n="how_s6_d">IP / подсеть /64 / URI · Redis</div>
+        </div>
+        <div class="flow-arrow hidden lg:block text-brand-400"><svg class="h-6 w-6 pipe-dot" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></div>
+
+        <div class="flow-step glass grad-border rounded-2xl p-4 text-center lg:flex-1" style="--tw-shadow: 0 0 0 1px rgba(45,212,191,.3)">
+          <div class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-400"><svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h5"/></svg></div>
+          <div class="text-sm font-bold text-white" data-i18n="how_s7_t">Upstream</div>
+          <div class="mt-1 text-xs text-green-400" data-i18n="how_s7_d">Только чистый трафик</div>
+        </div>
+      </div>
+
+      <p class="mt-8 text-center text-sm text-slate-500" data-i18n="how_note">Параллельно: репутация ASN/CIDR, GeoIP, honeypot + tarpit, CrowdSec LAPI и BGP RTBH для blackhole /32 апстриму при атаках высокой уверенности.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== BENCHMARKS ===================== -->
+<section id="benchmarks" class="relative py-24">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="reveal mx-auto max-w-3xl text-center">
+      <p class="text-sm font-bold uppercase tracking-widest text-brand-400" data-i18n="bench_kicker">Производительность</p>
+      <h2 class="mt-3 text-3xl font-extrabold text-white sm:text-4xl" data-i18n="bench_title">Бенчмарки и сравнение с nginx</h2>
+      <p class="mt-4 text-slate-400" data-i18n="bench_sub">Честно: «голый» nginx быстрее на статике без защиты. Ценность AEGIS — интегрированная защита L7 с конкурентной пропускной способностью. Все цифры зависят от железа, измерены на базовых 8 ядрах.</p>
+    </div>
+
+    <div class="reveal mt-12 grid gap-6 lg:grid-cols-2">
+      <div class="glass grad-border rounded-2xl p-6">
+        <h3 class="text-base font-bold text-white" data-i18n="bench_c1_t">RPS по режимам</h3>
+        <p class="mb-4 text-xs text-slate-500" data-i18n="bench_c1_s">raw nginx (без защиты) vs AEGIS (полная DDoS+WAF защита)</p>
+        <div class="h-72"><canvas id="chartRps"></canvas></div>
+      </div>
+      <div class="glass grad-border rounded-2xl p-6">
+        <h3 class="text-base font-bold text-white" data-i18n="bench_c2_t">TLS-рукопожатий в секунду</h3>
+        <p class="mb-4 text-xs text-slate-500" data-i18n="bench_c2_s">полные рукопожатия; HTTP/2-мультиплексирование поднимает реальную пропускную способность</p>
+        <div class="h-72"><canvas id="chartTls"></canvas></div>
+      </div>
+      <div class="glass grad-border rounded-2xl p-6">
+        <h3 class="text-base font-bold text-white" data-i18n="bench_c3_t">Задержка p99 под нагрузкой</h3>
+        <p class="mb-4 text-xs text-slate-500" data-i18n="bench_c3_s">мс, при росте конкурентности запросов</p>
+        <div class="h-72"><canvas id="chartLat"></canvas></div>
+      </div>
+      <div class="glass grad-border rounded-2xl p-6">
+        <h3 class="text-base font-bold text-white" data-i18n="bench_c4_t">Митигация атак</h3>
+        <p class="mb-4 text-xs text-slate-500" data-i18n="bench_c4_s">nginx «из коробки» закрывает мало векторов L7</p>
+        <div class="h-72"><canvas id="chartRadar"></canvas></div>
+      </div>
+    </div>
+    <p class="reveal mt-6 text-center text-xs text-slate-600" data-i18n="bench_disclaimer">Цифры — репрезентативные оценки на 8-ядерном базовом сервере и масштабируются с железом. Ваши результаты зависят от CPU, NIC, конфигурации и профиля трафика.</p>
+  </div>
+</section>
+
+<!-- ===================== DEPLOYMENT TIERS ===================== -->
+<section class="relative border-y border-white/5 bg-ink-800/30 py-24">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="reveal mx-auto max-w-2xl text-center">
+      <p class="text-sm font-bold uppercase tracking-widest text-brand-400" data-i18n="tier_kicker">Масштабирование</p>
+      <h2 class="mt-3 text-3xl font-extrabold text-white sm:text-4xl" data-i18n="tier_title">VPS, выделенный или облако</h2>
+      <p class="mt-4 text-slate-400" data-i18n="tier_sub">AEGIS использует SO_REUSEPORT и мультипроцессность — пропускная способность растёт почти линейно с ядрами.</p>
+    </div>
+
+    <div class="reveal mt-12 grid gap-6 lg:grid-cols-3">
+      <div class="glass grad-border rounded-2xl p-6">
+        <div class="text-xs font-bold uppercase tracking-wider text-slate-500" data-i18n="tier_1_tag">Малый VPS</div>
+        <div class="mt-1 text-2xl font-extrabold text-white" data-i18n="tier_1_core">2 ядра</div>
+        <div class="mt-4 text-3xl font-extrabold text-grad">~30K <span class="text-base font-bold text-slate-400" data-i18n="tier_rps">RPS</span></div>
+        <p class="mt-3 text-sm text-slate-400" data-i18n="tier_1_d">Идеально для индивидуальных проектов, блогов и небольших API под защитой.</p>
+      </div>
+      <div class="glass grad-border rounded-2xl p-6 ring-1 ring-brand-400/30">
+        <div class="text-xs font-bold uppercase tracking-wider text-brand-400" data-i18n="tier_2_tag">VPS · популярный</div>
+        <div class="mt-1 text-2xl font-extrabold text-white" data-i18n="tier_2_core">8 ядер</div>
+        <div class="mt-4 text-3xl font-extrabold text-grad">~120K <span class="text-base font-bold text-slate-400" data-i18n="tier_rps">RPS</span></div>
+        <p class="mt-3 text-sm text-slate-400" data-i18n="tier_2_d">Базовая конфигурация бенчмарков: SaaS, e-commerce, продакшен-нагрузки.</p>
+      </div>
+      <div class="glass grad-border rounded-2xl p-6">
+        <div class="text-xs font-bold uppercase tracking-wider text-slate-500" data-i18n="tier_3_tag">Выделенный</div>
+        <div class="mt-1 text-2xl font-extrabold text-white" data-i18n="tier_3_core">32 ядра</div>
+        <div class="mt-4 text-3xl font-extrabold text-grad">~450K+ <span class="text-base font-bold text-slate-400" data-i18n="tier_rps">RPS</span></div>
+        <p class="mt-3 text-sm text-slate-400" data-i18n="tier_3_d">Высоконагруженные платформы и точки агрегации трафика на грани сети.</p>
+      </div>
+    </div>
+
+    <div class="reveal mt-8 grid gap-6 lg:grid-cols-2">
+      <div class="glass grad-border rounded-2xl p-6">
+        <h3 class="text-base font-bold text-white" data-i18n="tier_chart_t">Масштабирование RPS по ядрам</h3>
+        <p class="mb-4 text-xs text-slate-500" data-i18n="tier_chart_s">режим plain-форвардинга, оценка</p>
+        <div class="h-72"><canvas id="chartScale"></canvas></div>
+      </div>
+      <div class="glass grad-border overflow-hidden rounded-2xl">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-white/5 text-xs uppercase tracking-wider text-slate-400">
+            <tr>
+              <th class="px-5 py-3.5 font-semibold" data-i18n="tier_th_tier">Тир</th>
+              <th class="px-5 py-3.5 font-semibold" data-i18n="tier_th_cores">Ядра</th>
+              <th class="px-5 py-3.5 font-semibold" data-i18n="tier_th_rps">RPS (plain)</th>
+              <th class="px-5 py-3.5 font-semibold" data-i18n="tier_th_waf">RPS + WAF</th>
+              <th class="px-5 py-3.5 font-semibold" data-i18n="tier_th_eff">Эфф.</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/5">
+            <tr class="transition hover:bg-white/[0.03]"><td class="px-5 py-3.5 font-medium text-white" data-i18n="tier_r1">Малый VPS</td><td class="px-5 py-3.5 text-slate-400">2</td><td class="px-5 py-3.5 text-slate-400">~30K</td><td class="px-5 py-3.5 text-slate-400">~7K</td><td class="px-5 py-3.5 text-brand-400" data-i18n="tier_eff_high">Высокая</td></tr>
+            <tr class="transition hover:bg-white/[0.03]"><td class="px-5 py-3.5 font-medium text-white" data-i18n="tier_r2">VPS 8-ядер</td><td class="px-5 py-3.5 text-slate-400">8</td><td class="px-5 py-3.5 text-slate-400">~120K</td><td class="px-5 py-3.5 text-slate-400">~28K</td><td class="px-5 py-3.5 text-brand-400" data-i18n="tier_eff_best">Лучшая цена/RPS</td></tr>
+            <tr class="transition hover:bg-white/[0.03]"><td class="px-5 py-3.5 font-medium text-white" data-i18n="tier_r3">Выделенный</td><td class="px-5 py-3.5 text-slate-400">32</td><td class="px-5 py-3.5 text-slate-400">~450K</td><td class="px-5 py-3.5 text-slate-400">~105K</td><td class="px-5 py-3.5 text-brand-400" data-i18n="tier_eff_max">Макс. throughput</td></tr>
+            <tr class="transition hover:bg-white/[0.03]"><td class="px-5 py-3.5 font-medium text-white" data-i18n="tier_r4">Облако (авто-масштаб)</td><td class="px-5 py-3.5 text-slate-400" data-i18n="tier_flex">гибко</td><td class="px-5 py-3.5 text-slate-400" data-i18n="tier_elastic">эластично</td><td class="px-5 py-3.5 text-slate-400" data-i18n="tier_elastic">эластично</td><td class="px-5 py-3.5 text-slate-400" data-i18n="tier_eff_payg">платишь за инстансы</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== USE CASES ===================== -->
+<section class="relative py-24">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="reveal mx-auto max-w-2xl text-center">
+      <p class="text-sm font-bold uppercase tracking-widest text-brand-400" data-i18n="uc_kicker">Кому подходит</p>
+      <h2 class="mt-3 text-3xl font-extrabold text-white sm:text-4xl" data-i18n="uc_title">Один продукт — два мира</h2>
+    </div>
+
+    <div class="reveal mt-12 grid gap-6 lg:grid-cols-2">
+      <div class="glass grad-border rounded-2xl p-8">
+        <div class="mb-5 flex items-center gap-3">
+          <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-500/10 text-brand-400"><svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/><path d="M9 9v.01M9 13v.01M9 17v.01"/></svg></div>
+          <h3 class="text-2xl font-extrabold text-white" data-i18n="uc_b_t">Бизнес</h3>
+        </div>
+        <p class="text-slate-400" data-i18n="uc_b_sub">SaaS и e-commerce, где простой стоит денег, а данные — под регламентом.</p>
+        <ul class="mt-6 space-y-3 text-sm">
+          <li class="flex gap-3"><svg class="mt-0.5 h-5 w-5 flex-none text-brand-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="uc_b_1">Аптайм и соответствие требованиям — трафик не покидает периметр</span></li>
+          <li class="flex gap-3"><svg class="mt-0.5 h-5 w-5 flex-none text-brand-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="uc_b_2">Интеграции SIEM и CrowdSec LAPI, threat-intel фиды</span></li>
+          <li class="flex gap-3"><svg class="mt-0.5 h-5 w-5 flex-none text-brand-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="uc_b_3">Аналитика ботов и DDoS за любой период из SQLite-лога</span></li>
+          <li class="flex gap-3"><svg class="mt-0.5 h-5 w-5 flex-none text-brand-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="uc_b_4">Админ-панель: дашборды, конфиг по доменам, restart без даунтайма</span></li>
+        </ul>
+      </div>
+
+      <div class="glass grad-border rounded-2xl p-8">
+        <div class="mb-5 flex items-center gap-3">
+          <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-cyber-400/10 text-cyber-400"><svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m8 6-6 6 6 6M16 6l6 6-6 6"/></svg></div>
+          <h3 class="text-2xl font-extrabold text-white" data-i18n="uc_v_t">Свой VPS</h3>
+        </div>
+        <p class="text-slate-400" data-i18n="uc_v_sub">Indie-разработчики, которым нужна серьёзная защита без облачных счетов.</p>
+        <ul class="mt-6 space-y-3 text-sm">
+          <li class="flex gap-3"><svg class="mt-0.5 h-5 w-5 flex-none text-cyber-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="uc_v_1">Установка одной командой — один бинарник и install.sh</span></li>
+          <li class="flex gap-3"><svg class="mt-0.5 h-5 w-5 flex-none text-cyber-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="uc_v_2">Бесплатно и open-source — никаких лимитов по запросам</span></li>
+          <li class="flex gap-3"><svg class="mt-0.5 h-5 w-5 flex-none text-cyber-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="uc_v_3">Полный контроль: ваши правила, ваши данные, ваше железо</span></li>
+          <li class="flex gap-3"><svg class="mt-0.5 h-5 w-5 flex-none text-cyber-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="uc_v_4">Никакой оплаты за запрос и облачного посредника в трафике</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== COMPARISON TABLE ===================== -->
+<section id="compare" class="relative border-y border-white/5 bg-ink-800/30 py-24">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="reveal mx-auto max-w-2xl text-center">
+      <p class="text-sm font-bold uppercase tracking-widest text-brand-400" data-i18n="cmp_kicker">Сравнение</p>
+      <h2 class="mt-3 text-3xl font-extrabold text-white sm:text-4xl" data-i18n="cmp_title">AEGIS против альтернатив</h2>
+    </div>
+
+    <div class="reveal mt-12 overflow-x-auto">
+      <div class="glass grad-border min-w-[720px] overflow-hidden rounded-2xl">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-white/5 text-xs uppercase tracking-wider text-slate-400">
+            <tr>
+              <th class="px-5 py-4 font-semibold" data-i18n="cmp_th_feat">Возможность</th>
+              <th class="px-5 py-4 text-center font-bold text-brand-400">AEGIS</th>
+              <th class="px-5 py-4 text-center font-semibold" data-i18n="cmp_th_nginx">nginx + ModSecurity</th>
+              <th class="px-5 py-4 text-center font-semibold" data-i18n="cmp_th_cf">Cloudflare / cloud WAF</th>
+            </tr>
+          </thead>
+          <tbody id="cmpBody" class="divide-y divide-white/5"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== WHY SELF-HOST ===================== -->
+<section class="relative py-24">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="reveal glass grad-border overflow-hidden rounded-3xl p-8 sm:p-12">
+      <div class="grid items-center gap-10 lg:grid-cols-2">
+        <div>
+          <p class="text-sm font-bold uppercase tracking-widest text-brand-400" data-i18n="why_kicker">Приватность</p>
+          <h2 class="mt-3 text-3xl font-extrabold text-white sm:text-4xl" data-i18n="why_title">Зачем self-host</h2>
+          <p class="mt-5 text-lg leading-relaxed text-slate-400" data-i18n="why_p">С облачным WAF весь ваш трафик проходит через чужую инфраструктуру, а счёт растёт с каждым запросом. AEGIS работает на вашем железе: данные пользователей не покидают ваш сервер, нет per-request биллинга, нет вендор-лока. Вы видите каждое решение движка и владеете всеми логами.</p>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="rounded-2xl bg-ink-900/60 p-5 text-center"><div class="text-3xl font-extrabold text-grad">0$</div><div class="mt-1 text-xs text-slate-400" data-i18n="why_s1">за запрос</div></div>
+          <div class="rounded-2xl bg-ink-900/60 p-5 text-center"><div class="text-3xl font-extrabold text-grad">0</div><div class="mt-1 text-xs text-slate-400" data-i18n="why_s2">данных уходит наружу</div></div>
+          <div class="rounded-2xl bg-ink-900/60 p-5 text-center"><div class="text-3xl font-extrabold text-grad">100%</div><div class="mt-1 text-xs text-slate-400" data-i18n="why_s3">контроля над правилами</div></div>
+          <div class="rounded-2xl bg-ink-900/60 p-5 text-center"><div class="text-3xl font-extrabold text-grad">∞</div><div class="mt-1 text-xs text-slate-400" data-i18n="why_s4">запросов без доплат</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== PRICING / GET STARTED ===================== -->
+<section id="pricing" class="relative border-y border-white/5 bg-ink-800/30 py-24">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="reveal mx-auto max-w-2xl text-center">
+      <p class="text-sm font-bold uppercase tracking-widest text-brand-400" data-i18n="price_kicker">Установка</p>
+      <h2 class="mt-3 text-3xl font-extrabold text-white sm:text-4xl" data-i18n="price_title">Разверните за пять минут</h2>
+      <p class="mt-4 text-slate-400" data-i18n="price_sub">Open-source и бесплатно для self-host. Опциональная поддержка — для команд, которым нужен SLA.</p>
+    </div>
+
+    <div class="reveal mx-auto mt-10 max-w-3xl">
+      <div class="glass grad-border rounded-2xl p-1.5">
+        <div class="rounded-xl bg-ink-900/80 p-5">
+          <div class="mb-3 flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-500" data-i18n="price_install">установка в один шаг</span>
+            <button id="copyBtn" class="rounded-md border border-white/10 px-3 py-1 text-xs font-bold text-slate-300 transition hover:border-brand-400/60 hover:text-white" data-i18n="price_copy">Копировать</button>
+          </div>
+          <pre class="overflow-x-auto font-mono text-sm leading-relaxed text-slate-200"><code id="installCmd">curl -fsSL https://get.aegis.sh | sudo bash</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="reveal mx-auto mt-12 grid max-w-4xl gap-6 md:grid-cols-2">
+      <div class="glass grad-border relative rounded-2xl p-8 ring-1 ring-brand-400/30">
+        <div class="absolute right-5 top-5 rounded-full bg-brand-500/15 px-3 py-1 text-xs font-bold text-brand-400" data-i18n="price_popular">Рекомендуем</div>
+        <h3 class="text-xl font-extrabold text-white" data-i18n="price_oss_t">Self-host (Open Source)</h3>
+        <div class="mt-3 flex items-baseline gap-1"><span class="text-4xl font-extrabold text-white" data-i18n="price_free">Бесплатно</span></div>
+        <p class="mt-3 text-sm text-slate-400" data-i18n="price_oss_d">Полный функционал. Навсегда. Ваше железо, ваши правила.</p>
+        <ul class="mt-6 space-y-2.5 text-sm">
+          <li class="flex gap-2.5"><svg class="h-5 w-5 flex-none text-brand-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="price_oss_1">Все возможности WAF, XDP, ML и challenge</span></li>
+          <li class="flex gap-2.5"><svg class="h-5 w-5 flex-none text-brand-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="price_oss_2">Неограниченные домены и запросы</span></li>
+          <li class="flex gap-2.5"><svg class="h-5 w-5 flex-none text-brand-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="price_oss_3">Поддержка сообщества и обновления</span></li>
+        </ul>
+        <a href="#" class="btn-primary mt-7 block rounded-xl px-5 py-3 text-center text-sm font-bold text-ink-900" data-i18n="price_oss_cta">Скачать на GitHub</a>
+      </div>
+
+      <div class="glass grad-border rounded-2xl p-8">
+        <h3 class="text-xl font-extrabold text-white" data-i18n="price_mgd_t">Managed / Поддержка</h3>
+        <div class="mt-3 flex items-baseline gap-1"><span class="text-4xl font-extrabold text-white" data-i18n="price_custom">По запросу</span></div>
+        <p class="mt-3 text-sm text-slate-400" data-i18n="price_mgd_d">Для команд, которым нужны SLA, приоритетная помощь и сопровождение.</p>
+        <ul class="mt-6 space-y-2.5 text-sm">
+          <li class="flex gap-2.5"><svg class="h-5 w-5 flex-none text-cyber-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="price_mgd_1">Приоритетная поддержка с SLA</span></li>
+          <li class="flex gap-2.5"><svg class="h-5 w-5 flex-none text-cyber-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="price_mgd_2">Помощь с настройкой правил и тюнингом</span></li>
+          <li class="flex gap-2.5"><svg class="h-5 w-5 flex-none text-cyber-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg><span class="text-slate-300" data-i18n="price_mgd_3">Кастомные интеграции и обучение команды</span></li>
+        </ul>
+        <a href="#" class="mt-7 block rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-center text-sm font-bold text-white transition hover:border-brand-400/50 hover:bg-white/10" data-i18n="price_mgd_cta">Связаться</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FAQ ===================== -->
+<section id="faq" class="relative py-24">
+  <div class="mx-auto max-w-3xl px-4 sm:px-6">
+    <div class="reveal text-center">
+      <p class="text-sm font-bold uppercase tracking-widest text-brand-400" data-i18n="faq_kicker">FAQ</p>
+      <h2 class="mt-3 text-3xl font-extrabold text-white sm:text-4xl" data-i18n="faq_title">Частые вопросы</h2>
+    </div>
+    <div id="faqList" class="reveal mt-10 space-y-3"></div>
+  </div>
+</section>
+
+<!-- ===================== FOOTER ===================== -->
+<footer class="relative border-t border-white/5 bg-ink-900 py-12">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="grid gap-8 md:grid-cols-4">
+      <div class="md:col-span-1">
+        <a href="#hero" class="flex items-center gap-2.5">
+          <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-cyber-500"><svg viewBox="0 0 24 24" class="h-5 w-5 text-ink-900" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 8.6 8 11 4.6-2.4 8-6 8-11V5l-8-3Zm0 2.2 6 2.25V11c0 3.9-2.5 6.9-6 8.8-3.5-1.9-6-4.9-6-8.8V6.45L12 4.2Z"/></svg></span>
+          <span class="text-lg font-extrabold text-white">AEGIS</span>
+        </a>
+        <p class="mt-3 max-w-xs text-sm text-slate-500" data-i18n="foot_tag">Self-hosted DDoS &amp; WAF реверс-прокси на Rust.</p>
+      </div>
+      <div>
+        <h4 class="text-sm font-bold text-white" data-i18n="foot_product">Продукт</h4>
+        <ul class="mt-3 space-y-2 text-sm text-slate-500">
+          <li><a href="#features" class="transition hover:text-brand-400" data-i18n="nav_features">Возможности</a></li>
+          <li><a href="#benchmarks" class="transition hover:text-brand-400" data-i18n="nav_bench">Бенчмарки</a></li>
+          <li><a href="#pricing" class="transition hover:text-brand-400" data-i18n="nav_pricing">Установка</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="text-sm font-bold text-white" data-i18n="foot_res">Ресурсы</h4>
+        <ul class="mt-3 space-y-2 text-sm text-slate-500">
+          <li><a href="#" class="transition hover:text-brand-400" data-i18n="foot_docs">Документация</a></li>
+          <li><a href="#faq" class="transition hover:text-brand-400" data-i18n="nav_faq">FAQ</a></li>
+          <li><a href="#" class="transition hover:text-brand-400">GitHub</a></li>
+          <li><a href="#" class="transition hover:text-brand-400">Gitea</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="text-sm font-bold text-white" data-i18n="foot_start">Начать</h4>
+        <p class="mt-3 text-sm text-slate-500" data-i18n="foot_cta_d">Разверните защиту прямо сейчас.</p>
+        <a href="#pricing" class="btn-primary mt-3 inline-block rounded-lg px-4 py-2 text-sm font-bold text-ink-900" data-i18n="nav_cta">Начать</a>
+      </div>
+    </div>
+    <div class="mt-10 flex flex-col items-center justify-between gap-3 border-t border-white/5 pt-6 sm:flex-row">
+      <p class="text-xs text-slate-600">© <span id="year"></span> AEGIS. <span data-i18n="foot_rights">Open-source. Все права защищены.</span></p>
+      <p class="text-xs text-slate-600" data-i18n="foot_built">Собрано на Rust · Pingora + Hyper</p>
+    </div>
+  </div>
+</footer>
+
+<div id="toast" class="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 translate-y-20 rounded-lg bg-brand-500 px-4 py-2 text-sm font-bold text-ink-900 opacity-0 shadow-lg transition-all duration-300"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

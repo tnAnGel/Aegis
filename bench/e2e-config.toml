@@ -1,0 +1,62 @@
+# Aegis end-to-end load harness config.
+#
+# Generated values get patched in at runtime by aegis-e2e:
+#   __AEGIS_LISTEN__, __ADMIN_LISTEN__, __UPSTREAM_URL__
+#
+# Each gate the harness tests is independently exercisable — we keep
+# challenge / bot / adaptive disabled so the WAF and rate-limit
+# scenarios don't get pre-empted by an unrelated escalation. Challenge
+# ladder + bot scoring have their own dedicated unit + integration
+# tests that don't need this harness.
+
+[server]
+listen = "__AEGIS_LISTEN__"
+request_timeout_ms = 5000
+graceful_shutdown_secs = 3
+header_read_timeout_ms = 1000
+h2_max_reset_streams = 50
+h2_max_concurrent_streams = 100
+proxy_protocol = "off"
+
+[admin]
+listen = "__ADMIN_LISTEN__"
+
+[upstream]
+url = "__UPSTREAM_URL__"
+
+[filters]
+default_action = "allow"
+
+[filters.ip_acl]
+deny = ["198.51.100.99"]
+allow = []
+
+[filters.rate_limit]
+enabled = true
+requests_per_second = 5
+burst = 5
+subnet_buckets = false
+subnet_24_multiplier = 8
+subnet_16_multiplier = 64
+hot_uri_rps_threshold = 50
+
+[filters.adaptive]
+enabled = false
+suspicious_rps_threshold = 1000
+penalty_seconds = 1
+
+[filters.challenge]
+enabled = false
+token_ttl_secs = 60
+hmac_secret = "e2e-harness-secret-must-be-non-empty"
+fp_ttl_secs = 3600
+
+[filters.waf]
+enabled = true
+max_body_bytes = 4096
+
+[filters.bot]
+enabled = false
+challenge_score = 35
+deny_score = 70
+penalty_seconds = 5

@@ -1,0 +1,23 @@
+{
+  "title": "Редактор конфигурации",
+  "subtitle": "Конфигурация в формате DSL, похожем на nginx. Проверьте перед применением — некорректная конфигурация не попадёт в работу.",
+  "unsavedChanges": "Несохранённые изменения",
+  "inSync": "Синхронизировано",
+  "revert": "Откатить",
+  "test": "Проверить",
+  "applyReload": "Применить и перезагрузить",
+  "lastTestPassed": "Последняя проверка — пройдена",
+  "lastTestFailed": "Последняя проверка — не пройдена",
+  "configOk": "конфигурация корректна",
+  "seeErrorBelow": "см. ошибку ниже",
+  "allChecksPassed": "Все проверки пройдены",
+  "validationError": "Ошибка проверки",
+  "editorTitle": "Конфигурация Aegis",
+  "editorDescription": "Редактируйте исходный DSL. Для всех ключевых слов Aegis доступны подсветка синтаксиса и автодополнение.",
+  "toast.configOk.title": "Конфигурация в порядке",
+  "toast.configInvalid.title": "Некорректная конфигурация",
+  "toast.testFailed.title": "Проверка не выполнена",
+  "toast.applied.title": "Применено",
+  "toast.reloadFailed.title": "Не удалось перезагрузить",
+  "toast.applyFailed.title": "Не удалось применить"
+}

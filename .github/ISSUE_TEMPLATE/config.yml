@@ -1,0 +1,10 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/tnAnGel/Aegis/security/advisories/new
+    about: >
+      Report privately through a GitHub security advisory, or email
+      darkzeit00@gmail.com. Never open a public issue for a vulnerability.
+  - name: Documentation
+    url: https://github.com/tnAnGel/Aegis/tree/main/docs
+    about: English, Russian and Chinese guides — check here before filing.

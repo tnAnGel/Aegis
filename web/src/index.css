@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* shadcn/ui-compatible palette. Dark is the default — the theme
+ * switcher toggles between .dark and .light root classes. Colours
+ * are tuned to read as a polished DevOps/security dashboard
+ * (similar palette to Linear/Vercel/Grafana). */
+@layer base {
+    :root.light {
+        --background: 0 0% 100%;
+        --foreground: 222 47% 11%;
+        --card: 0 0% 100%;
+        --card-foreground: 222 47% 11%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 222 47% 11%;
+        --primary: 217 91% 60%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 210 40% 96%;
+        --secondary-foreground: 222 47% 11%;
+        --muted: 210 40% 96%;
+        --muted-foreground: 215 16% 47%;
+        --accent: 210 40% 96%;
+        --accent-foreground: 222 47% 11%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 0 0% 100%;
+        --success: 142 71% 45%;
+        --success-foreground: 0 0% 100%;
+        --warning: 38 92% 50%;
+        --warning-foreground: 0 0% 100%;
+        --border: 214 32% 91%;
+        --input: 214 32% 91%;
+        --ring: 217 91% 60%;
+        --radius: 0.6rem;
+    }
+
+    :root,
+    :root.dark {
+        --background: 222 19% 8%;
+        --foreground: 213 31% 91%;
+        --card: 223 22% 10%;
+        --card-foreground: 213 31% 91%;
+        --popover: 223 22% 10%;
+        --popover-foreground: 213 31% 91%;
+        --primary: 217 91% 60%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 222 22% 14%;
+        --secondary-foreground: 213 31% 91%;
+        --muted: 222 22% 14%;
+        --muted-foreground: 215 15% 65%;
+        --accent: 222 22% 14%;
+        --accent-foreground: 213 31% 91%;
+        --destructive: 0 70% 60%;
+        --destructive-foreground: 213 31% 91%;
+        --success: 142 64% 48%;
+        --success-foreground: 0 0% 100%;
+        --warning: 38 92% 50%;
+        --warning-foreground: 0 0% 0%;
+        --border: 222 22% 18%;
+        --input: 222 22% 18%;
+        --ring: 217 91% 60%;
+        --radius: 0.6rem;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground;
+        font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+    }
+    /* tabular-nums for numeric tables / metric cards */
+    .tabular {
+        font-variant-numeric: tabular-nums;
+    }
+}
+
+/* monaco editor — match shadcn surface */
+.monaco-editor,
+.monaco-editor-background,
+.monaco-editor .margin {
+    background-color: hsl(var(--card)) !important;
+}

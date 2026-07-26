@@ -1,0 +1,15 @@
+{
+  "welcomeBack": "С возвращением, {{name}}",
+  "notifications": "Уведомления",
+  "notificationsUnread": "Уведомления — {{count}} непрочитанных",
+  "signOut": "Выйти",
+  "switchLanguage": "Сменить язык",
+  "status.connecting": "Подключение…",
+  "status.offline": "Сервер недоступен",
+  "status.degraded": "Снижена производительность",
+  "status.operational": "Все системы работают",
+  "status.site_one": "{{count}} сайт",
+  "status.site_few": "{{count}} сайта",
+  "status.site_many": "{{count}} сайтов",
+  "status.uptime": "работает {{minutes}} мин"
+}

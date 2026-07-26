@@ -1,0 +1,14 @@
+{
+  "welcomeBack": "Welcome back, {{name}}",
+  "notifications": "Notifications",
+  "notificationsUnread": "Notifications — {{count}} unread",
+  "signOut": "Sign out",
+  "switchLanguage": "Switch language",
+  "status.connecting": "Connecting…",
+  "status.offline": "Backend offline",
+  "status.degraded": "Degraded",
+  "status.operational": "All systems operational",
+  "status.site_one": "{{count}} site",
+  "status.site_other": "{{count}} sites",
+  "status.uptime": "up {{minutes}}m"
+}

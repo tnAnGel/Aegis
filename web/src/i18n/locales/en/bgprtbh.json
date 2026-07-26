@@ -1,0 +1,23 @@
+{
+  "title": "BGP RTBH",
+  "pageDescription": "Remotely-triggered blackhole dispatcher. Active /32 and /128 announcements are pushed upstream via an exabgp pipe and auto-withdrawn on TTL expiry or on manual request.",
+  "loadError": "Couldn't load BGP announcements",
+  "notWired.banner": "Module not attached. The BGP RTBH module is not wired into the running instance.",
+  "kpi.activeAnnouncements": "Active announcements",
+  "kpi.moduleStatus": "Module status",
+  "status.wired": "Wired",
+  "status.notWired": "Not wired",
+  "status.live": "Live",
+  "status.offline": "Offline",
+  "table.title": "ACTIVE ANNOUNCEMENTS",
+  "table.description": "Each row is a /32 or /128 announced upstream. Withdrawing revokes the announcement immediately; the TTL-based auto-revert still applies if you take no manual action.",
+  "table.empty": "No active announcements.",
+  "col.ip": "IP",
+  "col.community": "Community",
+  "col.age": "Age",
+  "col.action": "Action",
+  "ageSeconds": "{{count}}s",
+  "withdraw": "Withdraw",
+  "withdrawn": "Withdrew {{ip}}",
+  "withdrawFailed": "Failed"
+}

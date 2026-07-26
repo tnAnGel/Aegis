@@ -1,0 +1,17 @@
+/target
+/.idea
+/aegis.pid
+# Claude Code worktree + session artifacts. Not part of the project.
+.claude/
+# XDP build artifacts — built on the stand separately with the
+# nightly bpf toolchain. The .o object is copied to /etc/aegis/
+# during deploy and shouldn't live in git.
+xdp/aegis-xdp-ebpf/target/
+xdp/aegis-xdp-ebpf/Cargo.lock
+# Runtime artifact aegis writes per-domain metric snapshots into.
+# Should not be tracked — every run mutates it.
+config/domains.toml
+
+# macOS finder metadata
+.DS_Store
+**/.DS_Store
